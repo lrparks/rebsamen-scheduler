@@ -1,12 +1,11 @@
 import { useStaffContext } from '../../context/StaffContext.jsx';
 import { useBookingsContext } from '../../context/BookingsContext.jsx';
-import Button from '../common/Button.jsx';
 
 /**
  * Application header with staff info and actions
  */
-export default function Header({ onStaffClick, onRefresh }) {
-  const { currentStaff, initials, name } = useStaffContext();
+export default function Header({ onStaffClick, onRefresh, appMode, onSwitchMode }) {
+  const { currentStaff, initials } = useStaffContext();
   const { loading, lastRefresh } = useBookingsContext();
 
   const formatLastRefresh = () => {
@@ -37,37 +36,55 @@ export default function Header({ onStaffClick, onRefresh }) {
             </svg>
             <div>
               <h1 className="text-lg font-bold leading-tight">Rebsamen Tennis Center</h1>
-              <p className="text-xs text-green-200">Court Scheduler</p>
+              <p className="text-xs text-green-200">
+                {appMode === 'maintenance' ? 'Maintenance Dashboard' : 'Court Scheduler'}
+              </p>
             </div>
           </div>
         </div>
 
         {/* Actions */}
         <div className="flex items-center gap-4">
-          {/* Refresh Status */}
-          <div className="flex items-center gap-2 text-sm">
-            <button
-              onClick={onRefresh}
-              disabled={loading}
-              className="flex items-center gap-1 px-2 py-1 rounded hover:bg-white/10 transition-colors disabled:opacity-50"
-              title="Refresh bookings"
-            >
-              <svg
-                className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+          {/* Refresh Status - only show in full mode */}
+          {appMode === 'full' && (
+            <div className="flex items-center gap-2 text-sm">
+              <button
+                onClick={onRefresh}
+                disabled={loading}
+                className="flex items-center gap-1 px-2 py-1 rounded hover:bg-white/10 transition-colors disabled:opacity-50"
+                title="Refresh bookings"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-              <span className="hidden sm:inline text-green-200">{formatLastRefresh()}</span>
-            </button>
-          </div>
+                <svg
+                  className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+                <span className="hidden sm:inline text-green-200">{formatLastRefresh()}</span>
+              </button>
+            </div>
+          )}
+
+          {/* Mode Switch Button */}
+          <button
+            onClick={onSwitchMode}
+            className="flex items-center gap-1.5 px-2 py-1 text-xs bg-white/10 rounded hover:bg-white/20 transition-colors"
+            title="Switch access mode"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+            <span className="hidden sm:inline">
+              {appMode === 'maintenance' ? 'Maintenance Mode' : 'Full Access'}
+            </span>
+          </button>
 
           {/* Staff Selector */}
           <button
