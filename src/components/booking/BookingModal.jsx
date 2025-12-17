@@ -68,8 +68,12 @@ export default function BookingModal({
         // Use drag-selected courts if available
         const selectedCourts = initialData.courts || [initialData.court];
 
+        // Use drag-selected dates for multi-day bookings (from Weekly View)
+        const selectedDates = initialData.dates || [initialData.date];
+
         setFormData({
           date: initialData.date,
+          dates: selectedDates, // For multi-day bookings
           court: initialData.court,
           courts: selectedCourts,
           timeStart: startTime,
@@ -82,6 +86,7 @@ export default function BookingModal({
           paymentAmount: '10.00',
           paymentMethod: '',
           notes: '',
+          isMultiDay: selectedDates.length > 1,
         });
       }
     }
@@ -121,28 +126,37 @@ export default function BookingModal({
 
     setLoading(true);
     try {
-      const groupId = formData.courts.length > 1 ? generateGroupId(new Date(formData.date)) : null;
+      // Get all dates (for multi-day) and courts (for multi-court)
+      const dates = formData.dates || [formData.date];
+      const courts = formData.courts;
+      const isGroup = dates.length > 1 || courts.length > 1;
+      const groupId = isGroup ? generateGroupId(new Date(dates[0])) : null;
 
-      // Create booking for each court
-      const bookings = formData.courts.map(court => ({
-        booking_id: generateBookingId(formData.date, court, formData.timeStart),
-        group_id: groupId,
-        date: formData.date,
-        court: court,
-        time_start: formData.timeStart,
-        time_end: formData.timeEnd,
-        booking_type: formData.bookingType,
-        entity_id: formData.entityId || '',
-        customer_name: formData.customerName,
-        customer_phone: formData.customerPhone,
-        payment_status: formData.paymentStatus,
-        payment_amount: formData.paymentAmount,
-        payment_method: formData.paymentMethod,
-        notes: formData.notes,
-        status: 'active',
-        created_by: initials,
-        created_at: new Date().toISOString(),
-      }));
+      // Create booking for each date-court combination
+      const bookings = [];
+      for (const date of dates) {
+        for (const court of courts) {
+          bookings.push({
+            booking_id: generateBookingId(date, court, formData.timeStart),
+            group_id: groupId,
+            date: date,
+            court: court,
+            time_start: formData.timeStart,
+            time_end: formData.timeEnd,
+            booking_type: formData.bookingType,
+            entity_id: formData.entityId || '',
+            customer_name: formData.customerName,
+            customer_phone: formData.customerPhone,
+            payment_status: formData.paymentStatus,
+            payment_amount: formData.paymentAmount,
+            payment_method: formData.paymentMethod,
+            notes: formData.notes,
+            status: 'active',
+            created_by: initials,
+            created_at: new Date().toISOString(),
+          });
+        }
+      }
 
       const result = await createBooking(bookings.length === 1 ? bookings[0] : bookings);
 
@@ -153,7 +167,8 @@ export default function BookingModal({
         // Show success with booking ID
         const primaryId = bookings[0].booking_id;
         setCreatedBookingId(primaryId);
-        toast.success(`Booking created: ${primaryId}`);
+        const count = bookings.length;
+        toast.success(count > 1 ? `${count} bookings created` : `Booking created: ${primaryId}`);
 
         // Refresh data
         setTimeout(() => refreshBookings(), 1000);
@@ -226,6 +241,28 @@ export default function BookingModal({
   const handleCancel = () => {
     setIsNoShowCancel(false);
     setShowCancelModal(true);
+  };
+
+  const handleDuplicate = () => {
+    // Switch to create mode with booking data pre-filled
+    // Use today's date but keep time, courts, type, etc.
+    const today = formatDateISO(new Date());
+    setFormData({
+      date: today,
+      court: parseInt(booking.court, 10),
+      courts: [parseInt(booking.court, 10)],
+      timeStart: booking.time_start,
+      timeEnd: booking.time_end,
+      bookingType: booking.booking_type,
+      entityId: booking.entity_id || '',
+      customerName: booking.customer_name || '',
+      customerPhone: booking.customer_phone || '',
+      paymentStatus: PAYMENT_STATUS.PENDING,
+      paymentAmount: booking.payment_amount || '10.00',
+      paymentMethod: '',
+      notes: booking.notes ? `(Copied from ${booking.booking_id}) ${booking.notes}` : `(Copied from ${booking.booking_id})`,
+    });
+    setMode('create');
   };
 
   // Success screen after creation
@@ -312,13 +349,29 @@ export default function BookingModal({
                     Mark as No-Show
                   </Button>
                 )}
+
+                {/* Duplicate button */}
+                <Button
+                  variant="secondary"
+                  onClick={handleDuplicate}
+                  fullWidth
+                >
+                  Duplicate Booking
+                </Button>
               </div>
             )}
 
-            {/* Close button for non-active bookings */}
+            {/* Actions for non-active bookings */}
             {!isActive && (
-              <div className="border-t border-gray-200 pt-4">
-                <Button variant="secondary" onClick={onClose} fullWidth>
+              <div className="border-t border-gray-200 pt-4 space-y-3">
+                <Button
+                  variant="secondary"
+                  onClick={handleDuplicate}
+                  fullWidth
+                >
+                  Duplicate Booking
+                </Button>
+                <Button variant="outline" onClick={onClose} fullWidth>
                   Close
                 </Button>
               </div>

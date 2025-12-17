@@ -87,16 +87,30 @@ export default function BookingForm({
   const isTeam = formData.bookingType?.startsWith('team_');
   const showPayment = !isFreeBooking(formData.bookingType);
 
+  // Check if multi-day selection
+  const isMultiDay = formData.dates && formData.dates.length > 1;
+
   return (
     <div className="space-y-4">
+      {/* Multi-day indicator */}
+      {isMultiDay && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+          <strong>Multi-day booking:</strong> {formData.dates.length} days selected
+          <div className="text-xs mt-1 text-blue-600">
+            {formData.dates.join(', ')}
+          </div>
+        </div>
+      )}
+
       {/* Date & Time */}
       <div className="grid grid-cols-3 gap-3">
         <DatePicker
-          label="Date"
+          label={isMultiDay ? "Start Date" : "Date"}
           value={formData.date}
           onChange={handleFieldChange('date')}
           min={new Date().toISOString().split('T')[0]}
           required
+          disabled={isMultiDay}
         />
         <Select
           label="Start Time"
@@ -144,26 +158,38 @@ export default function BookingForm({
 
       {/* Contractor Selection */}
       {isContractor && (
-        <Select
-          label="Contractor"
-          value={formData.entityId}
-          onChange={handleFieldChange('entityId')}
-          options={contractorOptions}
-          placeholder="Select contractor..."
-          required
-        />
+        contractorOptions.length > 0 ? (
+          <Select
+            label="Contractor"
+            value={formData.entityId}
+            onChange={handleFieldChange('entityId')}
+            options={contractorOptions}
+            placeholder="Select contractor..."
+            required
+          />
+        ) : (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+            <strong>No contractors configured.</strong> Add contractors to the Contractors sheet in Google Sheets, or enter contractor info in Customer Name/Notes fields.
+          </div>
+        )
       )}
 
       {/* Team Selection */}
       {isTeam && (
-        <Select
-          label="Team"
-          value={formData.entityId}
-          onChange={handleFieldChange('entityId')}
-          options={teamOptions}
-          placeholder="Select team..."
-          required
-        />
+        teamOptions.length > 0 ? (
+          <Select
+            label="Team"
+            value={formData.entityId}
+            onChange={handleFieldChange('entityId')}
+            options={teamOptions}
+            placeholder="Select team..."
+            required
+          />
+        ) : (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+            <strong>No teams configured.</strong> Add teams to the Teams sheet in Google Sheets, or enter team info in Customer Name/Notes fields.
+          </div>
+        )
       )}
 
       {/* Customer Info */}
