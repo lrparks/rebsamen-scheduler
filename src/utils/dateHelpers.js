@@ -15,11 +15,12 @@ export function formatDateISO(date) {
 
 /**
  * Format date for display (e.g., "Monday, December 16, 2024")
- * @param {Date} date
+ * @param {Date|string} date
  * @returns {string}
  */
 export function formatDateDisplay(date) {
-  const d = new Date(date);
+  // Handle string dates by adding time to prevent timezone issues
+  const d = typeof date === 'string' ? parseDate(date) : new Date(date);
   return d.toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
