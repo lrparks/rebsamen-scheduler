@@ -16,7 +16,7 @@ export default function DailyGrid({
   onBookingClick,
   onEmptyCellClick,
 }) {
-  const { getBookingsForDate, loading } = useBookingsContext();
+  const { getBookingsForDate, loading, error } = useBookingsContext();
   const { courts } = useCourts();
 
   const timeSlots = getTimeSlots();
@@ -82,6 +82,14 @@ export default function DailyGrid({
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-gray-500">Loading bookings...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-red-500">Error loading bookings: {error}</div>
       </div>
     );
   }

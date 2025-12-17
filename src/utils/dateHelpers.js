@@ -117,7 +117,8 @@ export function getEndTimeOptions(startTime) {
  * @returns {boolean}
  */
 export function isToday(date) {
-  const d = new Date(date);
+  // Handle string dates by adding time to prevent timezone issues
+  const d = typeof date === 'string' ? parseDate(date) : new Date(date);
   const today = new Date();
   return d.toDateString() === today.toDateString();
 }
