@@ -8,6 +8,7 @@ import { BOOKING_TYPES } from '../config.js';
  * @returns {boolean}
  */
 export function isPrimeTime(date, timeStart) {
+  if (!date || !timeStart) return false;
   const d = new Date(date);
   const dayOfWeek = d.getDay(); // 0=Sun, 6=Sat
   const hour = parseInt(timeStart.split(':')[0], 10);
@@ -29,6 +30,8 @@ export function isPrimeTime(date, timeStart) {
  * @returns {number} Rate in dollars
  */
 export function calculateRate(date, timeStart, bookingType) {
+  if (!date || !timeStart) return 0;
+
   // Free categories
   if ([BOOKING_TYPES.MAINTENANCE, BOOKING_TYPES.HOLD].includes(bookingType)) {
     return 0;
