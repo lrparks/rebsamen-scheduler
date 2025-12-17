@@ -1,23 +1,31 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useTeams } from '../../hooks/useTeams.js';
 import { useBookingsContext } from '../../context/BookingsContext.jsx';
 import { useCourts } from '../../hooks/useCourts.js';
 import { formatDateDisplay, formatTimeDisplay, formatDateISO } from '../../utils/dateHelpers.js';
 import { getBookingTypeLabel } from '../../utils/colors.js';
+import { createTeam, updateTeam, deleteTeam } from '../../utils/api.js';
 import Modal from '../common/Modal.jsx';
+import Input from '../common/Input.jsx';
+import Select from '../common/Select.jsx';
+import { Textarea } from '../common/Input.jsx';
+import { useToast } from '../common/Toast.jsx';
 
 /**
  * Teams management view
  */
 export default function TeamsView({ onBookingClick }) {
-  const { teams, activeTeams, loading: teamsLoading } = useTeams();
+  const { teams, activeTeams, loading: teamsLoading, refresh: refreshTeams } = useTeams();
   const { bookings, loading: bookingsLoading } = useBookingsContext();
   const { getCourtName } = useCourts();
+  const { showToast } = useToast();
 
-  const [bookingsFilter, setBookingsFilter] = useState('upcoming'); // 'upcoming', 'past', 'all'
-  const [teamTypeFilter, setTeamTypeFilter] = useState('all'); // 'all', 'team_hs', 'team_college', 'team_usta', 'team_other'
-  const [selectedTeamId, setSelectedTeamId] = useState('all'); // 'all' or specific team_id
-  const [selectedTeam, setSelectedTeam] = useState(null); // For modal
+  const [bookingsFilter, setBookingsFilter] = useState('upcoming');
+  const [teamTypeFilter, setTeamTypeFilter] = useState('all');
+  const [selectedTeamId, setSelectedTeamId] = useState('all');
+  const [selectedTeam, setSelectedTeam] = useState(null);
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [editingTeam, setEditingTeam] = useState(null);
 
   const today = formatDateISO(new Date());
 
@@ -33,31 +41,22 @@ export default function TeamsView({ onBookingClick }) {
     return types.sort();
   }, [teams]);
 
-  // Filter bookings by time period and team
+  // Filter bookings
   const filteredBookings = useMemo(() => {
     return bookings.filter(b => {
-      // Must be a team booking
       if (!b.booking_type?.startsWith('team_')) return false;
       if (b.status === 'cancelled') return false;
-
-      // Time filter
       if (bookingsFilter === 'upcoming' && b.date < today) return false;
       if (bookingsFilter === 'past' && b.date >= today) return false;
-
-      // Team type filter
       if (teamTypeFilter !== 'all' && b.booking_type !== teamTypeFilter) return false;
-
-      // Specific team filter (by customer_name)
       if (selectedTeamId !== 'all') {
         const team = teams.find(t => t.team_id === selectedTeamId);
         if (team && b.customer_name !== team.team_name && b.customer_name !== team.name) {
           return false;
         }
       }
-
       return true;
     }).sort((a, b) => {
-      // Sort by date (descending for past, ascending for upcoming)
       const dateCompare = bookingsFilter === 'past'
         ? b.date.localeCompare(a.date)
         : a.date.localeCompare(b.date);
@@ -66,17 +65,76 @@ export default function TeamsView({ onBookingClick }) {
     });
   }, [bookings, bookingsFilter, teamTypeFilter, selectedTeamId, teams, today]);
 
-  // Get teams for the selected type (for team dropdown)
   const teamsForDropdown = useMemo(() => {
     if (teamTypeFilter === 'all') return activeTeams;
     return activeTeams.filter(t => t.team_type === teamTypeFilter);
   }, [activeTeams, teamTypeFilter]);
 
-  const loading = teamsLoading || bookingsLoading;
-
   const handleTeamTypeChange = (type) => {
     setTeamTypeFilter(type);
-    setSelectedTeamId('all'); // Reset team selection when type changes
+    setSelectedTeamId('all');
+  };
+
+  const handleAddTeam = () => {
+    setEditingTeam(null);
+    setShowFormModal(true);
+  };
+
+  const handleEditTeam = (team) => {
+    setEditingTeam(team);
+    setSelectedTeam(null);
+    setShowFormModal(true);
+  };
+
+  const handleDuplicateTeam = (team) => {
+    setEditingTeam({
+      ...team,
+      team_id: null,
+      name: `${team.team_name || team.name} (Copy)`,
+      team_name: `${team.team_name || team.name} (Copy)`,
+    });
+    setSelectedTeam(null);
+    setShowFormModal(true);
+  };
+
+  const handleDeleteTeam = async (team) => {
+    if (!confirm(`Are you sure you want to delete "${team.team_name || team.name}"?`)) {
+      return;
+    }
+    try {
+      const result = await deleteTeam(team.team_id);
+      if (result.success) {
+        showToast('Team deleted successfully', 'success');
+        setSelectedTeam(null);
+        refreshTeams();
+      } else {
+        showToast(result.error || 'Failed to delete team', 'error');
+      }
+    } catch (error) {
+      showToast('Failed to delete team', 'error');
+    }
+  };
+
+  const handleFormSubmit = async (formData) => {
+    try {
+      let result;
+      if (editingTeam?.team_id) {
+        result = await updateTeam(editingTeam.team_id, formData);
+      } else {
+        result = await createTeam(formData);
+      }
+
+      if (result.success) {
+        showToast(editingTeam?.team_id ? 'Team updated successfully' : 'Team created successfully', 'success');
+        setShowFormModal(false);
+        setEditingTeam(null);
+        refreshTeams();
+      } else {
+        showToast(result.error || 'Failed to save team', 'error');
+      }
+    } catch (error) {
+      showToast('Failed to save team', 'error');
+    }
   };
 
   return (
@@ -84,9 +142,8 @@ export default function TeamsView({ onBookingClick }) {
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-900">Teams</h2>
         <button
-          disabled
-          className="px-4 py-2 text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed"
-          title="Coming soon - add teams via Google Sheets"
+          onClick={handleAddTeam}
+          className="px-4 py-2 text-sm font-medium text-white bg-green-700 rounded-lg hover:bg-green-800 transition-colors"
         >
           + Add Team
         </button>
@@ -94,7 +151,6 @@ export default function TeamsView({ onBookingClick }) {
 
       {/* Filters Row */}
       <div className="flex flex-wrap items-center gap-4 bg-white rounded-lg border border-gray-200 p-4">
-        {/* Team Type Filter */}
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-gray-700">Type:</label>
           <select
@@ -113,7 +169,6 @@ export default function TeamsView({ onBookingClick }) {
           </select>
         </div>
 
-        {/* Team Name Filter */}
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-gray-700">Team:</label>
           <select
@@ -130,7 +185,6 @@ export default function TeamsView({ onBookingClick }) {
           </select>
         </div>
 
-        {/* Bookings Time Filter */}
         <div className="flex items-center gap-2 ml-auto">
           <label className="text-sm font-medium text-gray-700">Show:</label>
           <div className="flex rounded-lg border border-gray-300 overflow-hidden">
@@ -190,21 +244,11 @@ export default function TeamsView({ onBookingClick }) {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Date
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Time
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Team/Type
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Court
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Booking ID
-                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Team/Type</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Court</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Booking ID</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -221,26 +265,16 @@ export default function TeamsView({ onBookingClick }) {
                     onClick={() => onBookingClick?.(booking)}
                     className="hover:bg-gray-50 cursor-pointer"
                   >
-                    <td className="px-4 py-3 text-sm text-gray-900">
-                      {formatDateDisplay(booking.date)}
-                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{formatDateDisplay(booking.date)}</td>
                     <td className="px-4 py-3 text-sm text-gray-900">
                       {formatTimeDisplay(booking.time_start)} - {formatTimeDisplay(booking.time_end)}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      <div className="font-medium text-gray-900">
-                        {booking.customer_name || 'N/A'}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {getBookingTypeLabel(booking.booking_type)}
-                      </div>
+                      <div className="font-medium text-gray-900">{booking.customer_name || 'N/A'}</div>
+                      <div className="text-xs text-gray-500">{getBookingTypeLabel(booking.booking_type)}</div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900">
-                      {getCourtName(parseInt(booking.court, 10))}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-mono text-gray-500">
-                      {booking.booking_id}
-                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{getCourtName(parseInt(booking.court, 10))}</td>
+                    <td className="px-4 py-3 text-sm font-mono text-gray-500">{booking.booking_id}</td>
                   </tr>
                 ))
               )}
@@ -258,6 +292,17 @@ export default function TeamsView({ onBookingClick }) {
       <TeamDetailModal
         team={selectedTeam}
         onClose={() => setSelectedTeam(null)}
+        onEdit={handleEditTeam}
+        onDuplicate={handleDuplicateTeam}
+        onDelete={handleDeleteTeam}
+      />
+
+      {/* Team Form Modal */}
+      <TeamFormModal
+        isOpen={showFormModal}
+        onClose={() => { setShowFormModal(false); setEditingTeam(null); }}
+        team={editingTeam}
+        onSubmit={handleFormSubmit}
       />
     </div>
   );
@@ -288,31 +333,25 @@ function TeamCard({ team, onClick }) {
              team.team_type === 'team_usta' ? 'USTA League' : 'Team'}
           </p>
         </div>
-        <span className={`
-          px-2 py-1 text-xs font-medium rounded-full
-          ${team.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}
-        `}>
+        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+          team.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+        }`}>
           {team.status || 'Active'}
         </span>
       </div>
-
       <div className="mt-3 space-y-1 text-sm">
         {(team.school_name || team.organization) && (
-          <div className="text-gray-600 truncate">
-            {team.school_name || team.organization}
-          </div>
+          <div className="text-gray-600 truncate">{team.school_name || team.organization}</div>
         )}
         {team.contact_name && (
-          <div className="text-gray-500 text-xs">
-            Contact: {team.contact_name}
-          </div>
+          <div className="text-gray-500 text-xs">Contact: {team.contact_name}</div>
         )}
       </div>
     </div>
   );
 }
 
-function TeamDetailModal({ team, onClose }) {
+function TeamDetailModal({ team, onClose, onEdit, onDuplicate, onDelete }) {
   if (!team) return null;
 
   return (
@@ -327,10 +366,9 @@ function TeamDetailModal({ team, onClose }) {
                team.team_type === 'team_usta' ? 'USTA League' : 'Team'}
             </p>
           </div>
-          <span className={`
-            px-2 py-1 text-xs font-medium rounded-full
-            ${team.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}
-          `}>
+          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+            team.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+          }`}>
             {team.status || 'Active'}
           </span>
         </div>
@@ -385,32 +423,192 @@ function TeamDetailModal({ team, onClose }) {
         {/* Action Buttons */}
         <div className="border-t pt-4 flex gap-2">
           <button
-            disabled
-            className="flex-1 px-3 py-2 text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed"
-            title="Coming soon"
+            onClick={() => onEdit(team)}
+            className="flex-1 px-3 py-2 text-sm font-medium text-white bg-green-700 rounded-lg hover:bg-green-800"
           >
             Edit
           </button>
           <button
-            disabled
-            className="flex-1 px-3 py-2 text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed"
-            title="Coming soon"
+            onClick={() => onDuplicate(team)}
+            className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
           >
             Duplicate
           </button>
           <button
-            disabled
-            className="px-3 py-2 text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed"
-            title="Coming soon"
+            onClick={() => onDelete(team)}
+            className="px-3 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100"
           >
             Delete
           </button>
         </div>
 
-        <div className="text-xs text-gray-400">
-          Team ID: {team.team_id}
-        </div>
+        <div className="text-xs text-gray-400">Team ID: {team.team_id}</div>
       </div>
+    </Modal>
+  );
+}
+
+function TeamFormModal({ isOpen, onClose, team, onSubmit }) {
+  const [formData, setFormData] = useState({
+    name: '',
+    team_type: 'team_hs',
+    organization: '',
+    contact_name: '',
+    phone: '',
+    contact_email: '',
+    default_courts: '',
+    season_start: '',
+    season_end: '',
+    notes: '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  // Reset form when team changes
+  useEffect(() => {
+    if (team) {
+      setFormData({
+        name: team.team_name || team.name || '',
+        team_type: team.team_type || 'team_hs',
+        organization: team.school_name || team.organization || '',
+        contact_name: team.contact_name || '',
+        phone: team.contact_phone || team.phone || '',
+        contact_email: team.contact_email || '',
+        default_courts: team.default_courts || '',
+        season_start: team.season_start || '',
+        season_end: team.season_end || '',
+        notes: team.notes || '',
+      });
+    } else {
+      setFormData({
+        name: '',
+        team_type: 'team_hs',
+        organization: '',
+        contact_name: '',
+        phone: '',
+        contact_email: '',
+        default_courts: '',
+        season_start: '',
+        season_end: '',
+        notes: '',
+      });
+    }
+  }, [team, isOpen]);
+
+  const handleChange = (field) => (value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    await onSubmit(formData);
+    setSaving(false);
+  };
+
+  const teamTypeOptions = [
+    { value: 'team_hs', label: 'High School' },
+    { value: 'team_college', label: 'College' },
+    { value: 'team_usta', label: 'USTA League' },
+    { value: 'team_other', label: 'Other' },
+  ];
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={team?.team_id ? 'Edit Team' : 'Add New Team'}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Input
+          label="Team Name"
+          value={formData.name}
+          onChange={handleChange('name')}
+          placeholder="Enter team name"
+          required
+        />
+
+        <Select
+          label="Team Type"
+          value={formData.team_type}
+          onChange={handleChange('team_type')}
+          options={teamTypeOptions}
+          required
+        />
+
+        <Input
+          label="School/Organization"
+          value={formData.organization}
+          onChange={handleChange('organization')}
+          placeholder="Enter school or organization name"
+        />
+
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="Contact Name"
+            value={formData.contact_name}
+            onChange={handleChange('contact_name')}
+            placeholder="Coach name"
+          />
+          <Input
+            label="Phone"
+            type="tel"
+            value={formData.phone}
+            onChange={handleChange('phone')}
+            placeholder="(501) 555-1234"
+          />
+        </div>
+
+        <Input
+          label="Email"
+          type="email"
+          value={formData.contact_email}
+          onChange={handleChange('contact_email')}
+          placeholder="coach@school.edu"
+        />
+
+        <Input
+          label="Default Courts"
+          value={formData.default_courts}
+          onChange={handleChange('default_courts')}
+          placeholder="1,2,3,4"
+        />
+
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="Season Start"
+            type="date"
+            value={formData.season_start}
+            onChange={handleChange('season_start')}
+          />
+          <Input
+            label="Season End"
+            type="date"
+            value={formData.season_end}
+            onChange={handleChange('season_end')}
+          />
+        </div>
+
+        <Textarea
+          label="Notes"
+          value={formData.notes}
+          onChange={handleChange('notes')}
+          placeholder="Additional notes..."
+          rows={2}
+        />
+
+        <div className="flex gap-3 pt-4 border-t">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-green-700 rounded-lg hover:bg-green-800 disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : (team?.team_id ? 'Update Team' : 'Create Team')}
+          </button>
+        </div>
+      </form>
     </Modal>
   );
 }

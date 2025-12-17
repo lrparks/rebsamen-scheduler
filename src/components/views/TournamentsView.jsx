@@ -1,25 +1,32 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useTournaments } from '../../hooks/useTournaments.js';
 import { useBookingsContext } from '../../context/BookingsContext.jsx';
 import { useCourts } from '../../hooks/useCourts.js';
 import { formatDateDisplay, formatTimeDisplay, formatDateISO } from '../../utils/dateHelpers.js';
+import { createTournament, updateTournament, deleteTournament } from '../../utils/api.js';
 import Modal from '../common/Modal.jsx';
+import Input from '../common/Input.jsx';
+import { Textarea } from '../common/Input.jsx';
+import { useToast } from '../common/Toast.jsx';
 
 /**
  * Tournaments management view
  */
 export default function TournamentsView({ onBookingClick }) {
-  const { tournaments, upcomingTournaments, loading: tournamentsLoading, error } = useTournaments();
+  const { tournaments, upcomingTournaments, loading: tournamentsLoading, error, refresh: refreshTournaments } = useTournaments();
   const { bookings, loading: bookingsLoading } = useBookingsContext();
   const { getCourtName } = useCourts();
+  const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming', 'past', 'bookings'
-  const [bookingsFilter, setBookingsFilter] = useState('upcoming'); // 'upcoming', 'past', 'all'
-  const [selectedTournament, setSelectedTournament] = useState(null); // For modal
+  const [activeTab, setActiveTab] = useState('upcoming');
+  const [bookingsFilter, setBookingsFilter] = useState('upcoming');
+  const [selectedTournament, setSelectedTournament] = useState(null);
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [editingTournament, setEditingTournament] = useState(null);
 
   const today = formatDateISO(new Date());
 
-  // Past tournaments (sorted by end_date descending - most recent first)
+  // Past tournaments
   const pastTournaments = useMemo(() => {
     return tournaments.filter(t => {
       if (!t.end_date) return false;
@@ -33,14 +40,10 @@ export default function TournamentsView({ onBookingClick }) {
     return bookings.filter(b => {
       if (b.booking_type !== 'tournament') return false;
       if (b.status === 'cancelled') return false;
-
-      // Time filter
       if (bookingsFilter === 'upcoming' && b.date < today) return false;
       if (bookingsFilter === 'past' && b.date >= today) return false;
-
       return true;
     }).sort((a, b) => {
-      // Sort by date (descending for past, ascending for upcoming)
       const dateCompare = bookingsFilter === 'past'
         ? b.date.localeCompare(a.date)
         : a.date.localeCompare(b.date);
@@ -49,6 +52,69 @@ export default function TournamentsView({ onBookingClick }) {
     });
   }, [bookings, bookingsFilter, today]);
 
+  const handleAddTournament = () => {
+    setEditingTournament(null);
+    setShowFormModal(true);
+  };
+
+  const handleEditTournament = (tournament) => {
+    setEditingTournament(tournament);
+    setSelectedTournament(null);
+    setShowFormModal(true);
+  };
+
+  const handleDuplicateTournament = (tournament) => {
+    setEditingTournament({
+      ...tournament,
+      tournament_id: null,
+      name: `${tournament.name} (Copy)`,
+      start_date: '',
+      end_date: '',
+    });
+    setSelectedTournament(null);
+    setShowFormModal(true);
+  };
+
+  const handleCancelTournament = async (tournament) => {
+    if (!confirm(`Are you sure you want to cancel "${tournament.name}"?`)) {
+      return;
+    }
+    try {
+      const result = await deleteTournament(tournament.tournament_id);
+      if (result.success) {
+        showToast('Tournament cancelled successfully', 'success');
+        setSelectedTournament(null);
+        refreshTournaments();
+      } else {
+        showToast(result.error || 'Failed to cancel tournament', 'error');
+      }
+    } catch (error) {
+      showToast('Failed to cancel tournament', 'error');
+    }
+  };
+
+  const handleFormSubmit = async (formData) => {
+    try {
+      let result;
+      if (editingTournament?.tournament_id) {
+        result = await updateTournament(editingTournament.tournament_id, formData);
+      } else {
+        result = await createTournament(formData);
+      }
+
+      if (result.success) {
+        showToast(editingTournament?.tournament_id ? 'Tournament updated successfully' : 'Tournament created successfully', 'success');
+        setShowFormModal(false);
+        setEditingTournament(null);
+        refreshTournaments();
+      } else {
+        showToast(result.error || 'Failed to save tournament', 'error');
+      }
+    } catch (error) {
+      showToast('Failed to save tournament', 'error');
+    }
+  };
+
   const loading = tournamentsLoading || bookingsLoading;
 
   return (
@@ -56,9 +122,8 @@ export default function TournamentsView({ onBookingClick }) {
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-900">Tournaments</h2>
         <button
-          disabled
-          className="px-4 py-2 text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed"
-          title="Coming soon - add tournaments via Google Sheets"
+          onClick={handleAddTournament}
+          className="px-4 py-2 text-sm font-medium text-white bg-green-700 rounded-lg hover:bg-green-800 transition-colors"
         >
           + Add Tournament
         </button>
@@ -151,18 +216,10 @@ export default function TournamentsView({ onBookingClick }) {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Tournament
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Dates
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Organizer
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Status
-                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tournament</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dates</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Organizer</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -172,18 +229,14 @@ export default function TournamentsView({ onBookingClick }) {
                       onClick={() => setSelectedTournament(tournament)}
                       className="hover:bg-gray-50 cursor-pointer"
                     >
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                        {tournament.name}
-                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{tournament.name}</td>
                       <td className="px-4 py-3 text-sm text-gray-500">
                         {formatDateDisplay(tournament.start_date)}
                         {tournament.end_date && tournament.end_date !== tournament.start_date && (
                           <> - {formatDateDisplay(tournament.end_date)}</>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">
-                        {tournament.organizer || '-'}
-                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{tournament.organizer || '-'}</td>
                       <td className="px-4 py-3">
                         <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
                           {tournament.status || 'Completed'}
@@ -223,9 +276,7 @@ export default function TournamentsView({ onBookingClick }) {
                 </button>
               ))}
             </div>
-            <span className="text-sm text-gray-500 ml-2">
-              ({filteredBookings.length} bookings)
-            </span>
+            <span className="text-sm text-gray-500 ml-2">({filteredBookings.length} bookings)</span>
           </div>
 
           <div className="bg-white rounded-lg border border-gray-200">
@@ -237,21 +288,11 @@ export default function TournamentsView({ onBookingClick }) {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Date
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Time
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Tournament
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Court
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Booking ID
-                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tournament</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Court</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Booking ID</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -268,21 +309,13 @@ export default function TournamentsView({ onBookingClick }) {
                         onClick={() => onBookingClick?.(booking)}
                         className="hover:bg-gray-50 cursor-pointer"
                       >
-                        <td className="px-4 py-3 text-sm text-gray-900">
-                          {formatDateDisplay(booking.date)}
-                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{formatDateDisplay(booking.date)}</td>
                         <td className="px-4 py-3 text-sm text-gray-900">
                           {formatTimeDisplay(booking.time_start)} - {formatTimeDisplay(booking.time_end)}
                         </td>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                          {booking.customer_name || 'Tournament'}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-900">
-                          {getCourtName(parseInt(booking.court, 10))}
-                        </td>
-                        <td className="px-4 py-3 text-sm font-mono text-gray-500">
-                          {booking.booking_id}
-                        </td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{booking.customer_name || 'Tournament'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{getCourtName(parseInt(booking.court, 10))}</td>
+                        <td className="px-4 py-3 text-sm font-mono text-gray-500">{booking.booking_id}</td>
                       </tr>
                     ))
                   )}
@@ -302,14 +335,22 @@ export default function TournamentsView({ onBookingClick }) {
       <TournamentDetailModal
         tournament={selectedTournament}
         onClose={() => setSelectedTournament(null)}
+        onEdit={handleEditTournament}
+        onDuplicate={handleDuplicateTournament}
+        onCancel={handleCancelTournament}
+      />
+
+      {/* Tournament Form Modal */}
+      <TournamentFormModal
+        isOpen={showFormModal}
+        onClose={() => { setShowFormModal(false); setEditingTournament(null); }}
+        tournament={editingTournament}
+        onSubmit={handleFormSubmit}
       />
     </div>
   );
 }
 
-/**
- * Tournament card component
- */
 function TournamentCard({ tournament, onClick }) {
   const isCurrentlyRunning = () => {
     if (!tournament.start_date || !tournament.end_date) return false;
@@ -333,15 +374,13 @@ function TournamentCard({ tournament, onClick }) {
             <p className="text-sm text-gray-500">{tournament.organizer}</p>
           )}
         </div>
-        <span className={`
-          px-2 py-1 text-xs font-medium rounded-full
-          ${running
+        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+          running
             ? 'bg-green-100 text-green-800'
             : tournament.status === 'cancelled'
               ? 'bg-red-100 text-red-800'
               : 'bg-blue-100 text-blue-800'
-          }
-        `}>
+        }`}>
           {running ? 'In Progress' : tournament.status || 'Scheduled'}
         </span>
       </div>
@@ -357,24 +396,17 @@ function TournamentCard({ tournament, onClick }) {
           </div>
         )}
         {tournament.contact_name && (
-          <div className="text-gray-500 text-xs">
-            Contact: {tournament.contact_name}
-          </div>
+          <div className="text-gray-500 text-xs">Contact: {tournament.contact_name}</div>
         )}
         {tournament.default_courts && (
-          <div className="text-gray-500 text-xs">
-            Courts: {tournament.default_courts}
-          </div>
+          <div className="text-gray-500 text-xs">Courts: {tournament.default_courts}</div>
         )}
       </div>
     </div>
   );
 }
 
-/**
- * Tournament detail modal
- */
-function TournamentDetailModal({ tournament, onClose }) {
+function TournamentDetailModal({ tournament, onClose, onEdit, onDuplicate, onCancel }) {
   if (!tournament) return null;
 
   const isCurrentlyRunning = () => {
@@ -397,15 +429,13 @@ function TournamentDetailModal({ tournament, onClose }) {
               <p className="text-sm text-gray-500">{tournament.organizer}</p>
             )}
           </div>
-          <span className={`
-            px-2 py-1 text-xs font-medium rounded-full
-            ${running
+          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+            running
               ? 'bg-green-100 text-green-800'
               : tournament.status === 'cancelled'
                 ? 'bg-red-100 text-red-800'
                 : 'bg-blue-100 text-blue-800'
-            }
-          `}>
+          }`}>
             {running ? 'In Progress' : tournament.status || 'Scheduled'}
           </span>
         </div>
@@ -457,32 +487,176 @@ function TournamentDetailModal({ tournament, onClose }) {
         {/* Action Buttons */}
         <div className="border-t pt-4 flex gap-2">
           <button
-            disabled
-            className="flex-1 px-3 py-2 text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed"
-            title="Coming soon"
+            onClick={() => onEdit(tournament)}
+            className="flex-1 px-3 py-2 text-sm font-medium text-white bg-green-700 rounded-lg hover:bg-green-800"
           >
             Edit
           </button>
           <button
-            disabled
-            className="flex-1 px-3 py-2 text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed"
-            title="Coming soon"
+            onClick={() => onDuplicate(tournament)}
+            className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
           >
             Duplicate
           </button>
           <button
-            disabled
-            className="px-3 py-2 text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed"
-            title="Coming soon"
+            onClick={() => onCancel(tournament)}
+            className="px-3 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100"
           >
             Cancel
           </button>
         </div>
 
-        <div className="text-xs text-gray-400">
-          Tournament ID: {tournament.tournament_id}
-        </div>
+        <div className="text-xs text-gray-400">Tournament ID: {tournament.tournament_id}</div>
       </div>
+    </Modal>
+  );
+}
+
+function TournamentFormModal({ isOpen, onClose, tournament, onSubmit }) {
+  const [formData, setFormData] = useState({
+    name: '',
+    organizer: '',
+    contact_name: '',
+    contact_phone: '',
+    contact_email: '',
+    start_date: '',
+    end_date: '',
+    default_courts: '',
+    notes: '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  // Reset form when tournament changes
+  useEffect(() => {
+    if (tournament) {
+      setFormData({
+        name: tournament.name || '',
+        organizer: tournament.organizer || '',
+        contact_name: tournament.contact_name || '',
+        contact_phone: tournament.contact_phone || '',
+        contact_email: tournament.contact_email || '',
+        start_date: tournament.start_date || '',
+        end_date: tournament.end_date || '',
+        default_courts: tournament.default_courts || '',
+        notes: tournament.notes || '',
+      });
+    } else {
+      setFormData({
+        name: '',
+        organizer: '',
+        contact_name: '',
+        contact_phone: '',
+        contact_email: '',
+        start_date: '',
+        end_date: '',
+        default_courts: '',
+        notes: '',
+      });
+    }
+  }, [tournament, isOpen]);
+
+  const handleChange = (field) => (value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    await onSubmit(formData);
+    setSaving(false);
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={tournament?.tournament_id ? 'Edit Tournament' : 'Add New Tournament'}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Input
+          label="Tournament Name"
+          value={formData.name}
+          onChange={handleChange('name')}
+          placeholder="Enter tournament name"
+          required
+        />
+
+        <Input
+          label="Organizer"
+          value={formData.organizer}
+          onChange={handleChange('organizer')}
+          placeholder="Organization or person running the tournament"
+        />
+
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="Start Date"
+            type="date"
+            value={formData.start_date}
+            onChange={handleChange('start_date')}
+            required
+          />
+          <Input
+            label="End Date"
+            type="date"
+            value={formData.end_date}
+            onChange={handleChange('end_date')}
+            required
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="Contact Name"
+            value={formData.contact_name}
+            onChange={handleChange('contact_name')}
+            placeholder="Primary contact"
+          />
+          <Input
+            label="Phone"
+            type="tel"
+            value={formData.contact_phone}
+            onChange={handleChange('contact_phone')}
+            placeholder="(501) 555-1234"
+          />
+        </div>
+
+        <Input
+          label="Email"
+          type="email"
+          value={formData.contact_email}
+          onChange={handleChange('contact_email')}
+          placeholder="contact@example.com"
+        />
+
+        <Input
+          label="Default Courts"
+          value={formData.default_courts}
+          onChange={handleChange('default_courts')}
+          placeholder="1,2,3,4,5,6"
+        />
+
+        <Textarea
+          label="Notes"
+          value={formData.notes}
+          onChange={handleChange('notes')}
+          placeholder="Additional notes..."
+          rows={2}
+        />
+
+        <div className="flex gap-3 pt-4 border-t">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-green-700 rounded-lg hover:bg-green-800 disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : (tournament?.tournament_id ? 'Update Tournament' : 'Create Tournament')}
+          </button>
+        </div>
+      </form>
     </Modal>
   );
 }
