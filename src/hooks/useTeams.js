@@ -37,9 +37,13 @@ export function useTeams() {
   }, [teams]);
 
   /**
-   * Get active teams (within season dates)
+   * Get active teams (is_active=TRUE and within season dates)
    */
   const activeTeams = teams.filter(t => {
+    // Check is_active flag
+    if (t.is_active === 'FALSE' || t.is_active === false) return false;
+
+    // Check season dates if provided
     if (!t.season_start || !t.season_end) return true;
     const now = new Date();
     const start = new Date(t.season_start);
@@ -48,15 +52,16 @@ export function useTeams() {
   });
 
   /**
-   * Team options for dropdowns grouped by type
+   * Team options for dropdowns
+   * Maps CSV columns: name, organization, phone (not team_name, school_name, contact_phone)
    */
   const teamOptions = teams.map(t => ({
     value: t.team_id,
-    label: t.team_name,
+    label: t.name || t.team_name, // CSV uses 'name', fallback to 'team_name'
     type: t.team_type,
-    school: t.school_name,
+    school: t.organization || t.school_name, // CSV uses 'organization'
     contact: t.contact_name,
-    phone: t.contact_phone,
+    phone: t.phone || t.contact_phone, // CSV uses 'phone'
   }));
 
   return {
