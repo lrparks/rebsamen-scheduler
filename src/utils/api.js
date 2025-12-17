@@ -225,3 +225,35 @@ export async function updateTournament(tournamentId, updates) {
 export async function deleteTournament(tournamentId) {
   return callAppsScript('deleteTournament', { tournamentId });
 }
+
+// ============================================
+// CONTRACTOR CRUD OPERATIONS
+// ============================================
+
+/**
+ * Create a new contractor
+ * @param {object} contractor - Contractor data
+ * @returns {Promise<object>}
+ */
+export async function createContractor(contractor) {
+  return callAppsScript('createContractor', { contractor });
+}
+
+/**
+ * Update an existing contractor
+ * @param {string} contractorId
+ * @param {object} updates
+ * @returns {Promise<object>}
+ */
+export async function updateContractor(contractorId, updates) {
+  return callAppsScript('updateContractor', { contractorId, updates });
+}
+
+/**
+ * Delete a contractor (soft delete - sets is_active to FALSE)
+ * @param {string} contractorId
+ * @returns {Promise<object>}
+ */
+export async function deleteContractor(contractorId) {
+  return callAppsScript('deleteContractor', { contractorId });
+}
