@@ -330,7 +330,7 @@ function TaskItem({ task, completed, onComplete }) {
         {!completed && (
           <Button
             size="sm"
-            variant={showNotes ? 'secondary' : 'primary'}
+            variant="primary"
             onClick={() => showNotes ? handleComplete() : setShowNotes(true)}
             loading={loading}
           >

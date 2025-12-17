@@ -91,11 +91,32 @@ export default function WeekView({
     onDateChange(formatDateISO(new Date()));
   };
 
+  const goToPrevCourt = () => {
+    if (selectedCourt > 1) {
+      setSelectedCourt(selectedCourt - 1);
+    }
+  };
+
+  const goToNextCourt = () => {
+    if (selectedCourt < CONFIG.TOTAL_COURTS) {
+      setSelectedCourt(selectedCourt + 1);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Controls */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <IconButton
+            onClick={goToPrevCourt}
+            aria-label="Previous court"
+            disabled={selectedCourt <= 1}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </IconButton>
           <Select
             label="Select Court"
             value={selectedCourt}
@@ -103,6 +124,15 @@ export default function WeekView({
             options={courts}
             className="w-48"
           />
+          <IconButton
+            onClick={goToNextCourt}
+            aria-label="Next court"
+            disabled={selectedCourt >= CONFIG.TOTAL_COURTS}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </IconButton>
         </div>
 
         <div className="flex items-center gap-2">
