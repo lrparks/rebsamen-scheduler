@@ -23,12 +23,16 @@ const TEAM_TYPE_LABELS = {
   'college': 'College',
   'usta_league': 'USTA League',
   'usta': 'USTA League',
+  'usta_adult': 'USTA Adult',
+  'usta_junior': 'USTA Junior',
   'other': 'Other Team',
   // Plain labels (proper case)
   'High School': 'High School',
   'College': 'College',
   'USTA League': 'USTA League',
   'USTA': 'USTA League',
+  'USTA Adult': 'USTA Adult',
+  'USTA Junior': 'USTA Junior',
   'Other': 'Other Team',
 };
 
@@ -42,7 +46,7 @@ function getTeamTypeLabel(type) {
  * Teams management view - 50/50 layout with cards on top, bookings on bottom
  */
 export default function TeamsView({ onBookingClick }) {
-  const { teams, activeTeams, loading: teamsLoading, refresh: refreshTeams } = useTeams();
+  const { teams, activeTeams, loading: teamsLoading, refresh: refreshTeams, isInSeason } = useTeams();
   const { bookings, loading: bookingsLoading } = useBookingsContext();
   const { getCourtName } = useCourts();
   const { showToast } = useToast();
@@ -217,6 +221,7 @@ export default function TeamsView({ onBookingClick }) {
                   key={team.team_id}
                   team={team}
                   onClick={() => setSelectedTeam(team)}
+                  inSeason={isInSeason(team)}
                 />
               ))
             )}
@@ -340,22 +345,33 @@ export default function TeamsView({ onBookingClick }) {
   );
 }
 
-function TeamCard({ team, onClick }) {
+function TeamCard({ team, onClick, inSeason }) {
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-lg border border-gray-200 p-4 hover:border-green-500 hover:shadow-md cursor-pointer transition-all w-64 flex-shrink-0"
+      className={`rounded-lg border p-4 hover:shadow-md cursor-pointer transition-all w-64 flex-shrink-0 ${
+        inSeason
+          ? 'bg-white border-gray-200 hover:border-green-500'
+          : 'bg-gray-50 border-gray-300 opacity-75'
+      }`}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <h4 className="font-medium text-gray-900 truncate">{team.team_name || team.name}</h4>
           <p className="text-sm text-gray-500">{getTeamTypeLabel(team.team_type)}</p>
         </div>
-        <span className={`ml-2 px-2 py-1 text-xs font-medium rounded-full flex-shrink-0 ${
-          team.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-        }`}>
-          {team.status || 'Active'}
-        </span>
+        <div className="ml-2 flex flex-col items-end gap-1 flex-shrink-0">
+          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+            team.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+          }`}>
+            {team.status || 'Active'}
+          </span>
+          {!inSeason && (
+            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700">
+              Off Season
+            </span>
+          )}
+        </div>
       </div>
       <div className="mt-3 space-y-1 text-sm">
         {(team.school_name || team.organization) && (

@@ -57,21 +57,28 @@ export function useTeams() {
   }, [teams]);
 
   /**
-   * Get active teams (is_active=TRUE and within season dates)
+   * Get active teams (is_active=TRUE) - shows all regardless of season
    */
   const activeTeams = useMemo(() => {
     return teams.filter(t => {
-      // Check is_active flag
+      // Check is_active flag only
       if (t.is_active === 'FALSE' || t.is_active === false) return false;
-
-      // Check season dates if provided
-      if (!t.season_start || !t.season_end) return true;
-      const now = new Date();
-      const start = new Date(t.season_start);
-      const end = new Date(t.season_end);
-      return now >= start && now <= end;
+      return true;
     });
   }, [teams]);
+
+  /**
+   * Check if a team is currently in season
+   * @param {object} team
+   * @returns {boolean}
+   */
+  const isInSeason = useCallback((team) => {
+    if (!team.season_start || !team.season_end) return true;
+    const now = new Date();
+    const start = new Date(team.season_start);
+    const end = new Date(team.season_end);
+    return now >= start && now <= end;
+  }, []);
 
   /**
    * Team options for dropdowns
@@ -95,5 +102,6 @@ export function useTeams() {
     refresh: loadTeams,
     getTeamById,
     teamOptions,
+    isInSeason,
   };
 }
