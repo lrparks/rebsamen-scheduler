@@ -37,7 +37,7 @@ export default function DatePicker({
         type="date"
         id={inputId}
         name={name}
-        value={value}
+        value={value || ''}
         onChange={handleChange}
         min={min}
         max={max}
@@ -47,7 +47,7 @@ export default function DatePicker({
           block w-full px-3 py-2 text-sm
           border rounded-lg shadow-sm
           bg-white
-          focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary
+          focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500
           disabled:bg-gray-100 disabled:cursor-not-allowed
           ${error ? 'border-red-500' : 'border-gray-300'}
         `}
@@ -81,19 +81,19 @@ export function DateRangePicker({
       <div className="flex items-center gap-2">
         <input
           type="date"
-          value={startDate}
+          value={startDate || ''}
           onChange={(e) => onStartChange(e.target.value)}
           disabled={disabled}
-          className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+          className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
         />
         <span className="text-gray-500">to</span>
         <input
           type="date"
-          value={endDate}
+          value={endDate || ''}
           onChange={(e) => onEndChange(e.target.value)}
           min={startDate}
           disabled={disabled}
-          className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+          className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
         />
       </div>
     </div>
