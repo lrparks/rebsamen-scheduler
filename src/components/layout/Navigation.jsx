@@ -16,6 +16,7 @@ export default function Navigation({
     { id: 'weekly', label: 'Weekly View' },
     { id: 'contractors', label: 'Contractors' },
     { id: 'teams', label: 'Teams' },
+    { id: 'tournaments', label: 'Tournaments' },
     { id: 'search', label: 'Search' },
     { id: 'maintenance', label: 'Maintenance' },
   ];

@@ -9,6 +9,7 @@ import DailyGrid from './components/grid/DailyGrid.jsx';
 import WeekView from './components/grid/WeekView.jsx';
 import ContractorView from './components/views/ContractorView.jsx';
 import TeamsView from './components/views/TeamsView.jsx';
+import TournamentsView from './components/views/TournamentsView.jsx';
 import SearchView from './components/views/SearchView.jsx';
 import MaintenanceView from './components/views/MaintenanceView.jsx';
 import BookingModal from './components/booking/BookingModal.jsx';
@@ -90,6 +91,9 @@ function AppContent() {
 
       case 'teams':
         return <TeamsView onBookingClick={handleBookingClick} />;
+
+      case 'tournaments':
+        return <TournamentsView onBookingClick={handleBookingClick} />;
 
       case 'search':
         return <SearchView onBookingClick={handleBookingClick} />;

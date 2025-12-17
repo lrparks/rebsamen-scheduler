@@ -151,3 +151,13 @@ export async function fetchMaintenanceLog() {
   console.log('[API] Fetched maintenance log:', data.length);
   return data;
 }
+
+/**
+ * Fetch tournaments data
+ * @returns {Promise<Array>}
+ */
+export async function fetchTournaments() {
+  const data = await fetchCSV(CONFIG.CSV_URLS.tournaments);
+  console.log('[API] Fetched tournaments:', data.length);
+  return data;
+}
