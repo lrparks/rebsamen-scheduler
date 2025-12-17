@@ -13,11 +13,18 @@ import { useToast } from '../common/Toast.jsx';
 
 // Team type mapping - maps raw values to display labels
 const TEAM_TYPE_LABELS = {
+  // Booking type codes
   'team_hs': 'High School',
   'team_college': 'College',
   'team_usta': 'USTA League',
   'team_other': 'Other Team',
-  // Also handle if the CSV has the plain labels
+  // CSV variations with underscores
+  'high_school': 'High School',
+  'college': 'College',
+  'usta_league': 'USTA League',
+  'usta': 'USTA League',
+  'other': 'Other Team',
+  // Plain labels (proper case)
   'High School': 'High School',
   'College': 'College',
   'USTA League': 'USTA League',
@@ -27,7 +34,8 @@ const TEAM_TYPE_LABELS = {
 
 function getTeamTypeLabel(type) {
   if (!type) return 'Team';
-  return TEAM_TYPE_LABELS[type] || type; // Return the raw value if not in mapping
+  // Try exact match first, then lowercase match
+  return TEAM_TYPE_LABELS[type] || TEAM_TYPE_LABELS[type.toLowerCase()] || type;
 }
 
 /**
