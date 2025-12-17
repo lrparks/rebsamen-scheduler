@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { formatDateISO, formatDateDisplay, addDays, isToday } from '../../utils/dateHelpers.js';
+import { formatDateISO, formatDateDisplay, addDays, isToday, parseDate } from '../../utils/dateHelpers.js';
 import Button, { IconButton } from '../common/Button.jsx';
 
 /**
@@ -25,11 +25,11 @@ export default function Navigation({
   };
 
   const goToPrevDay = () => {
-    onDateChange(formatDateISO(addDays(new Date(selectedDate), -1)));
+    onDateChange(formatDateISO(addDays(parseDate(selectedDate), -1)));
   };
 
   const goToNextDay = () => {
-    onDateChange(formatDateISO(addDays(new Date(selectedDate), 1)));
+    onDateChange(formatDateISO(addDays(parseDate(selectedDate), 1)));
   };
 
   const handleDateInput = (e) => {

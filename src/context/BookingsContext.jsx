@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { fetchBookings as apiFetchBookings } from '../utils/api.js';
 import { CONFIG } from '../config.js';
 
@@ -18,7 +18,9 @@ export function BookingsProvider({ children }) {
     try {
       setLoading(true);
       setError(null);
+      console.log('[BookingsContext] Fetching bookings...');
       const data = await apiFetchBookings();
+      console.log('[BookingsContext] Received bookings:', data.length, data.slice(0, 2));
       setBookings(data);
       setLastRefresh(new Date());
     } catch (err) {
@@ -28,6 +30,18 @@ export function BookingsProvider({ children }) {
       setLoading(false);
     }
   }, []);
+
+  // Initial fetch and auto-refresh setup
+  useEffect(() => {
+    fetchBookings();
+
+    // Auto-refresh every minute
+    const interval = setInterval(() => {
+      fetchBookings();
+    }, CONFIG.REFRESH_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, [fetchBookings]);
 
   const refreshBookings = useCallback(() => {
     return fetchBookings();

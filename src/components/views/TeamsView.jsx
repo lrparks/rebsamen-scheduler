@@ -55,7 +55,7 @@ export default function TeamsView({ onBookingClick }) {
           onClick={() => setActiveTab('teams')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'teams'
-              ? 'border-primary text-primary'
+              ? 'border-green-700 text-green-700'
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
@@ -65,7 +65,7 @@ export default function TeamsView({ onBookingClick }) {
           onClick={() => setActiveTab('tournaments')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'tournaments'
-              ? 'border-primary text-primary'
+              ? 'border-green-700 text-green-700'
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >

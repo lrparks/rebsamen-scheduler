@@ -8,6 +8,7 @@ import {
   formatDateISO,
   formatTimeShort,
   isToday,
+  parseDate,
 } from '../../utils/dateHelpers.js';
 import { useBookingsContext } from '../../context/BookingsContext.jsx';
 import { useCourts } from '../../hooks/useCourts.js';
@@ -29,7 +30,7 @@ export default function WeekView({
   const { courtOptions } = useCourts();
 
   const timeSlots = getTimeSlots();
-  const weekStart = getStartOfWeek(new Date(selectedDate));
+  const weekStart = getStartOfWeek(parseDate(selectedDate));
   const weekDays = getWeekDays(weekStart);
 
   // Generate court options if not loaded
@@ -138,11 +139,11 @@ export default function WeekView({
                   className={`
                     flex-1 min-w-24 h-12 border-r border-gray-200
                     flex flex-col items-center justify-center
-                    ${isToday(day) ? 'bg-primary/5' : ''}
+                    ${isToday(day) ? 'bg-green-50' : ''}
                   `}
                 >
                   <span className="text-xs font-medium text-gray-500">{dayName}</span>
-                  <span className={`text-sm font-semibold ${isToday(day) ? 'text-primary' : 'text-gray-700'}`}>
+                  <span className={`text-sm font-semibold ${isToday(day) ? 'text-green-700' : 'text-gray-700'}`}>
                     {formatDateShort(day)}
                   </span>
                 </div>
@@ -171,7 +172,7 @@ export default function WeekView({
                     key={dateStr}
                     className={`
                       relative flex-1 min-w-24 h-16 border-r border-b border-gray-100
-                      ${isToday(day) ? 'bg-primary/5' : ''}
+                      ${isToday(day) ? 'bg-green-50' : ''}
                     `}
                   >
                     {cellData ? (

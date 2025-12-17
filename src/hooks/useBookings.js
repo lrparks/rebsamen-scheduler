@@ -1,29 +1,12 @@
-import { useEffect } from 'react';
 import { useBookingsContext } from '../context/BookingsContext.jsx';
-import { CONFIG } from '../config.js';
 
 /**
  * Hook for managing bookings
  * Wraps BookingsContext with additional functionality
+ * Note: Initial fetch and auto-refresh are handled by the BookingsProvider
  */
 export function useBookings() {
-  const context = useBookingsContext();
-
-  // Initial fetch on mount
-  useEffect(() => {
-    context.fetchBookings();
-  }, []);
-
-  // Auto-refresh every minute
-  useEffect(() => {
-    const interval = setInterval(() => {
-      context.refreshBookings();
-    }, CONFIG.REFRESH_INTERVAL);
-
-    return () => clearInterval(interval);
-  }, [context.refreshBookings]);
-
-  return context;
+  return useBookingsContext();
 }
 
 /**
