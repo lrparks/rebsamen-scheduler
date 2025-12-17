@@ -11,8 +11,27 @@ import Select from '../common/Select.jsx';
 import { Textarea } from '../common/Input.jsx';
 import { useToast } from '../common/Toast.jsx';
 
+// Team type mapping - maps raw values to display labels
+const TEAM_TYPE_LABELS = {
+  'team_hs': 'High School',
+  'team_college': 'College',
+  'team_usta': 'USTA League',
+  'team_other': 'Other Team',
+  // Also handle if the CSV has the plain labels
+  'High School': 'High School',
+  'College': 'College',
+  'USTA League': 'USTA League',
+  'USTA': 'USTA League',
+  'Other': 'Other Team',
+};
+
+function getTeamTypeLabel(type) {
+  if (!type) return 'Team';
+  return TEAM_TYPE_LABELS[type] || type; // Return the raw value if not in mapping
+}
+
 /**
- * Teams management view
+ * Teams management view - 50/50 layout with cards on top, bookings on bottom
  */
 export default function TeamsView({ onBookingClick }) {
   const { teams, activeTeams, loading: teamsLoading, refresh: refreshTeams } = useTeams();
@@ -35,10 +54,13 @@ export default function TeamsView({ onBookingClick }) {
     return activeTeams.filter(t => t.team_type === teamTypeFilter);
   }, [activeTeams, teamTypeFilter]);
 
-  // Get unique team types for dropdown
-  const teamTypes = useMemo(() => {
+  // Get unique team types for dropdown with proper labels
+  const teamTypeOptions = useMemo(() => {
     const types = [...new Set(teams.map(t => t.team_type).filter(Boolean))];
-    return types.sort();
+    return types.sort().map(type => ({
+      value: type,
+      label: getTeamTypeLabel(type),
+    }));
   }, [teams]);
 
   // Filter bookings
@@ -138,8 +160,9 @@ export default function TeamsView({ onBookingClick }) {
   };
 
   return (
-    <div className="space-y-6 p-4">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-full p-4 gap-4">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-shrink-0">
         <h2 className="text-xl font-semibold text-gray-900">Teams</h2>
         <button
           onClick={handleAddTeam}
@@ -149,100 +172,101 @@ export default function TeamsView({ onBookingClick }) {
         </button>
       </div>
 
-      {/* Filters Row */}
-      <div className="flex flex-wrap items-center gap-4 bg-white rounded-lg border border-gray-200 p-4">
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700">Type:</label>
-          <select
-            value={teamTypeFilter}
-            onChange={(e) => handleTeamTypeChange(e.target.value)}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-          >
-            <option value="all">All Types</option>
-            {teamTypes.map(type => (
-              <option key={type} value={type}>
-                {type === 'team_hs' ? 'High School' :
-                 type === 'team_college' ? 'College' :
-                 type === 'team_usta' ? 'USTA League' : 'Other'}
-              </option>
-            ))}
-          </select>
+      {/* TOP HALF - Team Cards */}
+      <div className="flex-1 min-h-0 flex flex-col">
+        {/* Teams Filter Row */}
+        <div className="flex items-center gap-4 mb-3 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-700">Type:</label>
+            <select
+              value={teamTypeFilter}
+              onChange={(e) => handleTeamTypeChange(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="all">All Types</option>
+              {teamTypeOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <span className="text-sm text-gray-500">
+            {filteredTeams.length} team{filteredTeams.length !== 1 ? 's' : ''}
+          </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700">Team:</label>
-          <select
-            value={selectedTeamId}
-            onChange={(e) => setSelectedTeamId(e.target.value)}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-          >
-            <option value="all">All Teams</option>
-            {teamsForDropdown.map(team => (
-              <option key={team.team_id} value={team.team_id}>
-                {team.team_name || team.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex items-center gap-2 ml-auto">
-          <label className="text-sm font-medium text-gray-700">Show:</label>
-          <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-            {[
-              { id: 'upcoming', label: 'Upcoming' },
-              { id: 'past', label: 'Past' },
-              { id: 'all', label: 'All' },
-            ].map(option => (
-              <button
-                key={option.id}
-                onClick={() => setBookingsFilter(option.id)}
-                className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                  bookingsFilter === option.id
-                    ? 'bg-green-700 text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
+        {/* Team Cards - Horizontal Scroll */}
+        <div className="overflow-x-auto flex-1">
+          <div className="flex gap-4 pb-2" style={{ minWidth: 'max-content' }}>
+            {filteredTeams.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 w-full">
+                No teams found
+              </div>
+            ) : (
+              filteredTeams.map((team) => (
+                <TeamCard
+                  key={team.team_id}
+                  team={team}
+                  onClick={() => setSelectedTeam(team)}
+                />
+              ))
+            )}
           </div>
         </div>
       </div>
 
-      {/* Teams Cards */}
-      <div>
-        <h3 className="text-lg font-medium text-gray-900 mb-3">
-          {teamTypeFilter === 'all' ? 'All Teams' : getTeamTypeLabel(teamTypeFilter)}
-          {' '}({filteredTeams.length})
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredTeams.length === 0 ? (
-            <div className="col-span-full text-center py-8 text-gray-500">
-              No teams found
-            </div>
-          ) : (
-            filteredTeams.map((team) => (
-              <TeamCard
-                key={team.team_id}
-                team={team}
-                onClick={() => setSelectedTeam(team)}
-              />
-            ))
-          )}
-        </div>
-      </div>
+      {/* BOTTOM HALF - Bookings Table */}
+      <div className="flex-1 min-h-0 flex flex-col bg-white rounded-lg border border-gray-200">
+        {/* Bookings Header & Filters */}
+        <div className="flex flex-wrap items-center gap-4 px-4 py-3 border-b border-gray-200 flex-shrink-0">
+          <h3 className="font-medium text-gray-900">Team Bookings</h3>
 
-      {/* Team Bookings Table */}
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="px-4 py-3 border-b border-gray-200">
-          <h3 className="font-medium text-gray-900">
-            {bookingsFilter === 'upcoming' ? 'Upcoming' : bookingsFilter === 'past' ? 'Past' : 'All'} Team Bookings
-            {' '}({filteredBookings.length})
-          </h3>
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-700">Team:</label>
+            <select
+              value={selectedTeamId}
+              onChange={(e) => setSelectedTeamId(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="all">All Teams</option>
+              {teamsForDropdown.map(team => (
+                <option key={team.team_id} value={team.team_id}>
+                  {team.team_name || team.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2 ml-auto">
+            <label className="text-sm font-medium text-gray-700">Show:</label>
+            <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+              {[
+                { id: 'upcoming', label: 'Upcoming' },
+                { id: 'past', label: 'Past' },
+                { id: 'all', label: 'All' },
+              ].map(option => (
+                <button
+                  key={option.id}
+                  onClick={() => setBookingsFilter(option.id)}
+                  className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                    bookingsFilter === option.id
+                      ? 'bg-green-700 text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <span className="text-sm text-gray-500">({filteredBookings.length})</span>
+          </div>
         </div>
-        <div className="overflow-x-auto">
+
+        {/* Bookings Table */}
+        <div className="overflow-auto flex-1">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 sticky top-0">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
@@ -259,7 +283,7 @@ export default function TeamsView({ onBookingClick }) {
                   </td>
                 </tr>
               ) : (
-                filteredBookings.slice(0, 50).map((booking) => (
+                filteredBookings.slice(0, 100).map((booking) => (
                   <tr
                     key={booking.booking_id}
                     onClick={() => onBookingClick?.(booking)}
@@ -280,9 +304,9 @@ export default function TeamsView({ onBookingClick }) {
               )}
             </tbody>
           </table>
-          {filteredBookings.length > 50 && (
+          {filteredBookings.length > 100 && (
             <div className="px-4 py-2 text-sm text-gray-500 bg-gray-50 border-t">
-              Showing first 50 of {filteredBookings.length} bookings
+              Showing first 100 of {filteredBookings.length} bookings
             </div>
           )}
         </div>
@@ -308,32 +332,18 @@ export default function TeamsView({ onBookingClick }) {
   );
 }
 
-function getTeamTypeLabel(type) {
-  switch (type) {
-    case 'team_hs': return 'High School Teams';
-    case 'team_college': return 'College Teams';
-    case 'team_usta': return 'USTA League Teams';
-    case 'team_other': return 'Other Teams';
-    default: return 'Teams';
-  }
-}
-
 function TeamCard({ team, onClick }) {
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-lg border border-gray-200 p-4 hover:border-green-500 hover:shadow-md cursor-pointer transition-all"
+      className="bg-white rounded-lg border border-gray-200 p-4 hover:border-green-500 hover:shadow-md cursor-pointer transition-all w-64 flex-shrink-0"
     >
       <div className="flex items-start justify-between">
-        <div>
-          <h4 className="font-medium text-gray-900">{team.team_name || team.name}</h4>
-          <p className="text-sm text-gray-500">
-            {team.team_type === 'team_hs' ? 'High School' :
-             team.team_type === 'team_college' ? 'College' :
-             team.team_type === 'team_usta' ? 'USTA League' : 'Team'}
-          </p>
+        <div className="flex-1 min-w-0">
+          <h4 className="font-medium text-gray-900 truncate">{team.team_name || team.name}</h4>
+          <p className="text-sm text-gray-500">{getTeamTypeLabel(team.team_type)}</p>
         </div>
-        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+        <span className={`ml-2 px-2 py-1 text-xs font-medium rounded-full flex-shrink-0 ${
           team.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
         }`}>
           {team.status || 'Active'}
@@ -345,6 +355,9 @@ function TeamCard({ team, onClick }) {
         )}
         {team.contact_name && (
           <div className="text-gray-500 text-xs">Contact: {team.contact_name}</div>
+        )}
+        {(team.contact_phone || team.phone) && (
+          <div className="text-gray-500 text-xs">Phone: {team.contact_phone || team.phone}</div>
         )}
       </div>
     </div>
@@ -360,11 +373,7 @@ function TeamDetailModal({ team, onClose, onEdit, onDuplicate, onDelete }) {
         <div className="flex items-start justify-between">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">{team.team_name || team.name}</h3>
-            <p className="text-sm text-gray-500">
-              {team.team_type === 'team_hs' ? 'High School' :
-               team.team_type === 'team_college' ? 'College' :
-               team.team_type === 'team_usta' ? 'USTA League' : 'Team'}
-            </p>
+            <p className="text-sm text-gray-500">{getTeamTypeLabel(team.team_type)}</p>
           </div>
           <span className={`px-2 py-1 text-xs font-medium rounded-full ${
             team.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
