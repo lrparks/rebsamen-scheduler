@@ -3,6 +3,8 @@ import { fetchCSV } from './csvParser.js';
 
 /**
  * Call Apps Script API
+ * Uses text/plain content type to avoid CORS preflight (OPTIONS request)
+ * which Google Apps Script doesn't support
  * @param {string} action - Action name
  * @param {object} data - Request data
  * @returns {Promise<object>} Response data
@@ -11,7 +13,7 @@ export async function callAppsScript(action, data) {
   try {
     const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action, ...data }),
     });
 
