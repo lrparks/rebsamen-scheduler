@@ -81,7 +81,16 @@ export default function TeamsView({ onBookingClick }) {
 
   return (
     <div className="space-y-6 p-4">
-      <h2 className="text-xl font-semibold text-gray-900">Teams</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-gray-900">Teams</h2>
+        <button
+          disabled
+          className="px-4 py-2 text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed"
+          title="Coming soon - add teams via Google Sheets"
+        >
+          + Add Team
+        </button>
+      </div>
 
       {/* Filters Row */}
       <div className="flex flex-wrap items-center gap-4 bg-white rounded-lg border border-gray-200 p-4">
@@ -373,7 +382,32 @@ function TeamDetailModal({ team, onClose }) {
           )}
         </div>
 
-        <div className="border-t pt-4 text-xs text-gray-400">
+        {/* Action Buttons */}
+        <div className="border-t pt-4 flex gap-2">
+          <button
+            disabled
+            className="flex-1 px-3 py-2 text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed"
+            title="Coming soon"
+          >
+            Edit
+          </button>
+          <button
+            disabled
+            className="flex-1 px-3 py-2 text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed"
+            title="Coming soon"
+          >
+            Duplicate
+          </button>
+          <button
+            disabled
+            className="px-3 py-2 text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed"
+            title="Coming soon"
+          >
+            Delete
+          </button>
+        </div>
+
+        <div className="text-xs text-gray-400">
           Team ID: {team.team_id}
         </div>
       </div>
