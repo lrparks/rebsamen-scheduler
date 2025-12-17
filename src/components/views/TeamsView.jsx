@@ -11,6 +11,17 @@ import Select from '../common/Select.jsx';
 import { Textarea } from '../common/Input.jsx';
 import { useToast } from '../common/Toast.jsx';
 
+// Map team types (from teams CSV) to booking types (from bookings CSV)
+const TEAM_TYPE_TO_BOOKING_TYPE = {
+  'high_school': 'team_hs',
+  'college': 'team_college',
+  'usta_league': 'team_usta',
+  'usta': 'team_usta',
+  'usta_adult': 'team_usta',
+  'usta_junior': 'team_usta',
+  'other': 'team_other',
+};
+
 // Team type mapping - maps raw values to display labels
 const TEAM_TYPE_LABELS = {
   // Booking type codes
@@ -82,7 +93,11 @@ export default function TeamsView({ onBookingClick }) {
       if (b.status === 'cancelled') return false;
       if (bookingsFilter === 'upcoming' && b.date < today) return false;
       if (bookingsFilter === 'past' && b.date >= today) return false;
-      if (teamTypeFilter !== 'all' && b.booking_type !== teamTypeFilter) return false;
+      // Map team type filter to booking type for comparison
+      if (teamTypeFilter !== 'all') {
+        const expectedBookingType = TEAM_TYPE_TO_BOOKING_TYPE[teamTypeFilter] || teamTypeFilter;
+        if (b.booking_type !== expectedBookingType) return false;
+      }
       if (selectedTeamId !== 'all') {
         const team = teams.find(t => t.team_id === selectedTeamId);
         if (team && b.customer_name !== team.team_name && b.customer_name !== team.name) {
@@ -236,22 +251,6 @@ export default function TeamsView({ onBookingClick }) {
           <h3 className="font-medium text-gray-900">Team Bookings</h3>
 
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Team:</label>
-            <select
-              value={selectedTeamId}
-              onChange={(e) => setSelectedTeamId(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-            >
-              <option value="all">All Teams</option>
-              {teamsForDropdown.map(team => (
-                <option key={team.team_id} value={team.team_id}>
-                  {team.team_name || team.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2 ml-auto">
             <label className="text-sm font-medium text-gray-700">Show:</label>
             <div className="flex rounded-lg border border-gray-300 overflow-hidden">
               {[
@@ -272,6 +271,22 @@ export default function TeamsView({ onBookingClick }) {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="flex items-center gap-2 ml-auto">
+            <label className="text-sm font-medium text-gray-700">Team:</label>
+            <select
+              value={selectedTeamId}
+              onChange={(e) => setSelectedTeamId(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="all">All Teams</option>
+              {teamsForDropdown.map(team => (
+                <option key={team.team_id} value={team.team_id}>
+                  {team.team_name || team.name}
+                </option>
+              ))}
+            </select>
             <span className="text-sm text-gray-500">({filteredBookings.length})</span>
           </div>
         </div>

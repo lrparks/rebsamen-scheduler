@@ -213,6 +213,8 @@ export default function DailyGrid({
                 key={court.court_number}
                 className="flex-1 min-w-20 border-l border-gray-200"
               >
+                {/* Spacer to align with TimeColumn header */}
+                <div className="h-12 border-b border-gray-200" />
                 {timeSlots.map((time, timeIndex) => {
                   const courtNum = parseInt(court.court_number, 10);
                   const key = `${courtNum}-${time}`;
