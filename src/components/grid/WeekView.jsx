@@ -14,7 +14,7 @@ import { useBookingsContext } from '../../context/BookingsContext.jsx';
 import { useCourts } from '../../hooks/useCourts.js';
 import Select from '../common/Select.jsx';
 import Button, { IconButton } from '../common/Button.jsx';
-import BookingCell, { EmptyCell } from './BookingCell.jsx';
+import BookingCell from './BookingCell.jsx';
 
 /**
  * Weekly view for a single court
@@ -228,5 +228,25 @@ export default function WeekView({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Simple empty cell for WeekView (no drag support)
+ */
+function EmptyCell({ date, court, time, onClick }) {
+  return (
+    <button
+      onClick={() => onClick({ date, court, time })}
+      className="
+        absolute inset-0.5 rounded
+        bg-transparent hover:bg-gray-100
+        transition-colors cursor-pointer
+        border border-transparent hover:border-gray-300 hover:border-dashed
+      "
+      title={`Book Court ${court} at ${time}`}
+    >
+      <span className="sr-only">Book Court {court} at {time}</span>
+    </button>
   );
 }
