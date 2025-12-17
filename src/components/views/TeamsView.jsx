@@ -273,7 +273,7 @@ export default function TeamsView({ onBookingClick }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="flex items-center gap-2">
             <label className="text-sm font-medium text-gray-700">Team:</label>
             <select
               value={selectedTeamId}
@@ -287,8 +287,9 @@ export default function TeamsView({ onBookingClick }) {
                 </option>
               ))}
             </select>
-            <span className="text-sm text-gray-500">({filteredBookings.length})</span>
           </div>
+
+          <span className="text-sm text-gray-500 ml-auto">({filteredBookings.length})</span>
         </div>
 
         {/* Bookings Table */}
