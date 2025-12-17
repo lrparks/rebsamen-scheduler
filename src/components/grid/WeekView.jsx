@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { CONFIG } from '../../config.js';
 import {
   getTimeSlots,
@@ -17,7 +17,7 @@ import Button, { IconButton } from '../common/Button.jsx';
 import BookingCell from './BookingCell.jsx';
 
 /**
- * Weekly view for a single court
+ * Weekly view for a single court with drag-to-select support
  */
 export default function WeekView({
   selectedDate,
@@ -28,6 +28,11 @@ export default function WeekView({
   const [selectedCourt, setSelectedCourt] = useState(1);
   const { getBookingsForDateAndCourt, loading } = useBookingsContext();
   const { courtOptions } = useCourts();
+
+  // Drag selection state
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState(null); // { dayIndex, timeIndex }
+  const [dragEnd, setDragEnd] = useState(null); // { dayIndex, timeIndex }
 
   const timeSlots = getTimeSlots();
   const weekStart = getStartOfWeek(parseDate(selectedDate));
@@ -74,6 +79,101 @@ export default function WeekView({
 
     return map;
   }, [weekDays, selectedCourt, getBookingsForDateAndCourt, timeSlots]);
+
+  // Calculate selection range
+  const selectionRange = useMemo(() => {
+    if (!dragStart || !dragEnd) return null;
+
+    const minDayIndex = Math.min(dragStart.dayIndex, dragEnd.dayIndex);
+    const maxDayIndex = Math.max(dragStart.dayIndex, dragEnd.dayIndex);
+    const minTimeIndex = Math.min(dragStart.timeIndex, dragEnd.timeIndex);
+    const maxTimeIndex = Math.max(dragStart.timeIndex, dragEnd.timeIndex);
+
+    return { minDayIndex, maxDayIndex, minTimeIndex, maxTimeIndex };
+  }, [dragStart, dragEnd]);
+
+  // Check if a cell is in the selection
+  const isCellSelected = useCallback((dayIndex, timeIndex) => {
+    if (!selectionRange) return false;
+    return (
+      dayIndex >= selectionRange.minDayIndex &&
+      dayIndex <= selectionRange.maxDayIndex &&
+      timeIndex >= selectionRange.minTimeIndex &&
+      timeIndex <= selectionRange.maxTimeIndex
+    );
+  }, [selectionRange]);
+
+  // Handle drag start
+  const handleDragStart = useCallback((dayIndex, timeIndex) => {
+    setIsDragging(true);
+    setDragStart({ dayIndex, timeIndex });
+    setDragEnd({ dayIndex, timeIndex });
+  }, []);
+
+  // Handle drag move
+  const handleDragMove = useCallback((dayIndex, timeIndex) => {
+    if (isDragging) {
+      setDragEnd({ dayIndex, timeIndex });
+    }
+  }, [isDragging]);
+
+  // Handle drag end
+  const handleDragEnd = useCallback(() => {
+    if (isDragging && dragStart && dragEnd && selectionRange) {
+      const { minDayIndex, maxDayIndex, minTimeIndex, maxTimeIndex } = selectionRange;
+
+      // Get the time values
+      const startTime = timeSlots[minTimeIndex];
+      const endTime = timeSlots[maxTimeIndex + 1] || '21:00';
+
+      // Get list of selected dates
+      const selectedDates = [];
+      for (let d = minDayIndex; d <= maxDayIndex; d++) {
+        selectedDates.push(formatDateISO(weekDays[d]));
+      }
+
+      // Call the handler with selection data
+      onEmptyCellClick({
+        date: selectedDates[0], // Primary date
+        dates: selectedDates, // All selected dates
+        court: selectedCourt,
+        courts: [selectedCourt],
+        time: startTime,
+        timeStart: startTime,
+        timeEnd: endTime,
+        isMultiDay: selectedDates.length > 1,
+      });
+    }
+
+    // Reset drag state
+    setIsDragging(false);
+    setDragStart(null);
+    setDragEnd(null);
+  }, [isDragging, dragStart, dragEnd, selectionRange, timeSlots, weekDays, selectedCourt, onEmptyCellClick]);
+
+  // Handle mouse up anywhere
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isDragging) {
+        handleDragEnd();
+      }
+    };
+
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, [isDragging, handleDragEnd]);
+
+  // Prevent text selection during drag
+  useEffect(() => {
+    if (isDragging) {
+      document.body.style.userSelect = 'none';
+    } else {
+      document.body.style.userSelect = '';
+    }
+    return () => {
+      document.body.style.userSelect = '';
+    };
+  }, [isDragging]);
 
   const goToPrevWeek = () => {
     const newDate = new Date(weekStart);
@@ -182,7 +282,7 @@ export default function WeekView({
           </div>
 
           {/* Time Rows */}
-          {timeSlots.map((time) => (
+          {timeSlots.map((time, timeIndex) => (
             <div key={time} className="flex">
               {/* Time Label */}
               <div className="w-16 flex-shrink-0 h-16 border-r border-b border-gray-100 flex items-start justify-end px-2 py-1">
@@ -192,10 +292,11 @@ export default function WeekView({
               </div>
 
               {/* Day Cells */}
-              {weekDays.map((day) => {
+              {weekDays.map((day, dayIndex) => {
                 const dateStr = formatDateISO(day);
                 const key = `${dateStr}-${time}`;
                 const cellData = weekBookings.get(key);
+                const isSelected = isCellSelected(dayIndex, timeIndex);
 
                 return (
                   <div
@@ -214,10 +315,14 @@ export default function WeekView({
                       />
                     ) : (
                       <EmptyCell
-                        date={dateStr}
-                        court={selectedCourt}
+                        dayIndex={dayIndex}
                         time={time}
-                        onClick={onEmptyCellClick}
+                        timeIndex={timeIndex}
+                        court={selectedCourt}
+                        isSelected={isSelected}
+                        isDragging={isDragging}
+                        onDragStart={handleDragStart}
+                        onDragMove={handleDragMove}
                       />
                     )}
                   </div>
@@ -232,21 +337,43 @@ export default function WeekView({
 }
 
 /**
- * Simple empty cell for WeekView (no drag support)
+ * Empty cell for WeekView with drag support
  */
-function EmptyCell({ date, court, time, onClick }) {
+function EmptyCell({
+  dayIndex,
+  time,
+  timeIndex,
+  court,
+  isSelected,
+  isDragging,
+  onDragStart,
+  onDragMove,
+}) {
+  const handleMouseDown = (e) => {
+    e.preventDefault();
+    onDragStart(dayIndex, timeIndex);
+  };
+
+  const handleMouseEnter = () => {
+    onDragMove(dayIndex, timeIndex);
+  };
+
   return (
-    <button
-      onClick={() => onClick({ date, court, time })}
-      className="
+    <div
+      onMouseDown={handleMouseDown}
+      onMouseEnter={handleMouseEnter}
+      className={`
         absolute inset-0.5 rounded
-        bg-transparent hover:bg-gray-100
-        transition-colors cursor-pointer
-        border border-transparent hover:border-gray-300 hover:border-dashed
-      "
+        transition-colors cursor-pointer select-none
+        ${isSelected
+          ? 'bg-green-200 border-2 border-green-500'
+          : 'bg-transparent hover:bg-gray-100 border border-transparent hover:border-gray-300 hover:border-dashed'
+        }
+        ${isDragging ? 'cursor-crosshair' : ''}
+      `}
       title={`Book Court ${court} at ${time}`}
     >
       <span className="sr-only">Book Court {court} at {time}</span>
-    </button>
+    </div>
   );
 }
