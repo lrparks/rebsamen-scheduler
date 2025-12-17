@@ -9,6 +9,7 @@ import { BOOKING_TYPES, PAYMENT_STATUS, PAYMENT_METHODS, CONFIG } from '../../co
 import { useCourts } from '../../hooks/useCourts.js';
 import { useContractors } from '../../hooks/useContractors.js';
 import { useTeams } from '../../hooks/useTeams.js';
+import { useTournaments } from '../../hooks/useTournaments.js';
 
 /**
  * Booking form fields for create/edit
@@ -21,6 +22,7 @@ export default function BookingForm({
   const { courtOptions } = useCourts();
   const { contractorOptions } = useContractors();
   const { teamOptions } = useTeams();
+  const { tournamentOptions } = useTournaments();
 
   const timeSlots = getTimeSlots();
   const endTimeOptions = getEndTimeOptions(formData.timeStart);
@@ -85,6 +87,7 @@ export default function BookingForm({
 
   const isContractor = formData.bookingType === BOOKING_TYPES.CONTRACTOR;
   const isTeam = formData.bookingType?.startsWith('team_');
+  const isTournament = formData.bookingType === BOOKING_TYPES.TOURNAMENT;
   const showPayment = !isFreeBooking(formData.bookingType);
 
   // Check if multi-day selection
@@ -188,6 +191,30 @@ export default function BookingForm({
         ) : (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
             <strong>No teams configured.</strong> Add teams to the Teams sheet in Google Sheets, or enter team info in Customer Name/Notes fields.
+          </div>
+        )
+      )}
+
+      {/* Tournament Selection */}
+      {isTournament && (
+        tournamentOptions.length > 0 ? (
+          <Select
+            label="Tournament"
+            value={formData.entityId}
+            onChange={(value) => {
+              const tournament = tournamentOptions.find(t => t.value === value);
+              onChange({
+                entityId: value,
+                customerName: tournament?.label || '', // Auto-fill tournament name
+              });
+            }}
+            options={tournamentOptions}
+            placeholder="Select tournament..."
+            required
+          />
+        ) : (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+            <strong>No tournaments configured.</strong> Add tournaments to the Tournaments sheet in Google Sheets, or enter tournament name in Customer Name field.
           </div>
         )
       )}
