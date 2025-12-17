@@ -161,3 +161,67 @@ export async function fetchTournaments() {
   console.log('[API] Fetched tournaments:', data.length);
   return data;
 }
+
+// ============================================
+// TEAM CRUD OPERATIONS
+// ============================================
+
+/**
+ * Create a new team
+ * @param {object} team - Team data
+ * @returns {Promise<object>}
+ */
+export async function createTeam(team) {
+  return callAppsScript('createTeam', { team });
+}
+
+/**
+ * Update an existing team
+ * @param {string} teamId
+ * @param {object} updates
+ * @returns {Promise<object>}
+ */
+export async function updateTeam(teamId, updates) {
+  return callAppsScript('updateTeam', { teamId, updates });
+}
+
+/**
+ * Delete a team (soft delete - sets is_active to FALSE)
+ * @param {string} teamId
+ * @returns {Promise<object>}
+ */
+export async function deleteTeam(teamId) {
+  return callAppsScript('deleteTeam', { teamId });
+}
+
+// ============================================
+// TOURNAMENT CRUD OPERATIONS
+// ============================================
+
+/**
+ * Create a new tournament
+ * @param {object} tournament - Tournament data
+ * @returns {Promise<object>}
+ */
+export async function createTournament(tournament) {
+  return callAppsScript('createTournament', { tournament });
+}
+
+/**
+ * Update an existing tournament
+ * @param {string} tournamentId
+ * @param {object} updates
+ * @returns {Promise<object>}
+ */
+export async function updateTournament(tournamentId, updates) {
+  return callAppsScript('updateTournament', { tournamentId, updates });
+}
+
+/**
+ * Delete/cancel a tournament
+ * @param {string} tournamentId
+ * @returns {Promise<object>}
+ */
+export async function deleteTournament(tournamentId) {
+  return callAppsScript('deleteTournament', { tournamentId });
+}
