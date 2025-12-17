@@ -76,22 +76,3 @@ export default function BookingCell({
   );
 }
 
-/**
- * Empty cell for creating new bookings
- */
-export function EmptyCell({ date, court, time, onClick }) {
-  return (
-    <button
-      onClick={() => onClick({ date, court, time })}
-      className="
-        absolute inset-0.5 rounded
-        bg-transparent hover:bg-gray-100
-        transition-colors cursor-pointer
-        border border-transparent hover:border-gray-300 hover:border-dashed
-      "
-      title={`Book Court ${court} at ${time}`}
-    >
-      <span className="sr-only">Book Court {court} at {time}</span>
-    </button>
-  );
-}

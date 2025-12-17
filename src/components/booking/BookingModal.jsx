@@ -58,15 +58,22 @@ export default function BookingModal({
           notes: booking.notes || '',
         });
       } else if (initialData) {
-        // Create new booking with pre-filled data
+        // Create new booking with pre-filled data from drag selection
         setMode('create');
-        const defaultEndTime = getDefaultEndTime(initialData.time);
+
+        // Use drag-selected times if available, otherwise calculate defaults
+        const startTime = initialData.timeStart || initialData.time;
+        const endTime = initialData.timeEnd || getDefaultEndTime(startTime);
+
+        // Use drag-selected courts if available
+        const selectedCourts = initialData.courts || [initialData.court];
+
         setFormData({
           date: initialData.date,
           court: initialData.court,
-          courts: [initialData.court],
-          timeStart: initialData.time,
-          timeEnd: defaultEndTime,
+          courts: selectedCourts,
+          timeStart: startTime,
+          timeEnd: endTime,
           bookingType: BOOKING_TYPES.OPEN,
           entityId: '',
           customerName: '',
