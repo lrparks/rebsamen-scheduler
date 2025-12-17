@@ -1,12 +1,39 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useStaffContext } from '../../context/StaffContext.jsx';
 import { logMaintenance, fetchMaintenanceLog } from '../../utils/api.js';
-import { formatDateDisplay, formatDateISO } from '../../utils/dateHelpers.js';
+import { formatDateDisplay, formatDateISO, getStartOfWeek } from '../../utils/dateHelpers.js';
 import { useCourts } from '../../hooks/useCourts.js';
-import Button from '../common/Button.jsx';
+import Button, { IconButton } from '../common/Button.jsx';
 import Select from '../common/Select.jsx';
 import { Textarea } from '../common/Input.jsx';
 import { useToast } from '../common/Toast.jsx';
+
+/**
+ * Get the Monday of the week containing the given date
+ */
+function getWeekStart(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
+  return new Date(d.setDate(diff));
+}
+
+/**
+ * Format week range for display
+ */
+function formatWeekRange(weekStart) {
+  const start = new Date(weekStart);
+  const end = new Date(weekStart);
+  end.setDate(end.getDate() + 6);
+
+  const startMonth = start.toLocaleDateString('en-US', { month: 'short' });
+  const endMonth = end.toLocaleDateString('en-US', { month: 'short' });
+
+  if (startMonth === endMonth) {
+    return `${startMonth} ${start.getDate()} - ${end.getDate()}`;
+  }
+  return `${startMonth} ${start.getDate()} - ${endMonth} ${end.getDate()}`;
+}
 
 /**
  * Maintenance dashboard view
@@ -19,6 +46,10 @@ export default function MaintenanceView() {
   const [maintenanceLog, setMaintenanceLog] = useState([]);
   const [loading, setLoading] = useState(true);
   const [completedToday, setCompletedToday] = useState(new Set());
+
+  // History filters
+  const [historyWeekStart, setHistoryWeekStart] = useState(() => getWeekStart(new Date()));
+  const [showFollowUpOnly, setShowFollowUpOnly] = useState(false);
 
   const today = formatDateISO(new Date());
   const dayOfWeek = new Date().getDay(); // 0=Sun, 6=Sat
@@ -118,18 +149,59 @@ export default function MaintenanceView() {
   const todayDayOfMonth = new Date().getDate();
   const todaysMonthlyTasks = monthlyTasks.filter(t => t.dayOfMonth === todayDayOfMonth);
 
-  // Recent maintenance history
+  // Week navigation helpers
+  const goToPrevWeek = useCallback(() => {
+    setHistoryWeekStart(prev => {
+      const newDate = new Date(prev);
+      newDate.setDate(newDate.getDate() - 7);
+      return newDate;
+    });
+  }, []);
+
+  const goToNextWeek = useCallback(() => {
+    setHistoryWeekStart(prev => {
+      const newDate = new Date(prev);
+      newDate.setDate(newDate.getDate() + 7);
+      return newDate;
+    });
+  }, []);
+
+  const goToThisWeek = useCallback(() => {
+    setHistoryWeekStart(getWeekStart(new Date()));
+  }, []);
+
+  const isCurrentWeek = useMemo(() => {
+    const currentWeekStart = getWeekStart(new Date());
+    return formatDateISO(historyWeekStart) === formatDateISO(currentWeekStart);
+  }, [historyWeekStart]);
+
+  // Recent maintenance history with week and follow-up filters
   const recentHistory = useMemo(() => {
+    const weekEnd = new Date(historyWeekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    const weekStartStr = formatDateISO(historyWeekStart);
+    const weekEndStr = formatDateISO(weekEnd);
+
     return maintenanceLog
-      .filter(entry => entry.status === 'completed')
+      .filter(entry => {
+        if (entry.status !== 'completed') return false;
+
+        // Week filter
+        const entryDate = entry.date || entry.completed_date;
+        if (entryDate < weekStartStr || entryDate > weekEndStr) return false;
+
+        // Follow-up filter
+        if (showFollowUpOnly && entry.follow_up_needed !== 'TRUE') return false;
+
+        return true;
+      })
       .sort((a, b) => {
         // Support both completed_at (ISO) and completed_date/completed_time (CSV format)
         const dateA = a.completed_at || `${a.completed_date}T${a.completed_time || '00:00'}`;
         const dateB = b.completed_at || `${b.completed_date}T${b.completed_time || '00:00'}`;
         return new Date(dateB) - new Date(dateA);
-      })
-      .slice(0, 20);
-  }, [maintenanceLog]);
+      });
+  }, [maintenanceLog, historyWeekStart, showFollowUpOnly]);
 
   if (loading) {
     return (
@@ -234,7 +306,48 @@ export default function MaintenanceView() {
       {/* Maintenance History */}
       <div className="bg-white rounded-lg border border-gray-200">
         <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-          <h3 className="font-medium text-gray-900">Recent Maintenance History</h3>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <h3 className="font-medium text-gray-900">Maintenance History</h3>
+
+            <div className="flex items-center gap-4">
+              {/* Follow-up filter */}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showFollowUpOnly}
+                  onChange={(e) => setShowFollowUpOnly(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                />
+                <span className="text-sm text-gray-700">Needs Follow-up Only</span>
+              </label>
+
+              {/* Week navigation */}
+              <div className="flex items-center gap-2">
+                <IconButton onClick={goToPrevWeek} aria-label="Previous week">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </IconButton>
+                <button
+                  onClick={goToThisWeek}
+                  className={`px-3 py-1 text-sm rounded ${
+                    isCurrentWeek
+                      ? 'bg-green-700 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {formatWeekRange(historyWeekStart)}
+                </button>
+                <IconButton onClick={goToNextWeek} aria-label="Next week">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </IconButton>
+              </div>
+
+              <span className="text-sm text-gray-500">({recentHistory.length})</span>
+            </div>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
