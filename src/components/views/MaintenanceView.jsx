@@ -158,15 +158,17 @@ export default function MaintenanceView() {
     return monthlyTasks.filter(t => t.dayOfMonth === selectedDayOfMonth);
   }, [monthlyTasks, selectedDayOfMonth]);
 
+  // Get completion info for a task on the selected date
+  const getCompletionInfo = useCallback((taskId) => {
+    return maintenanceLog.find(entry => {
+      const entryDate = entry.date || entry.completed_date;
+      return entryDate === selectedDateStr && entry.task_id === taskId && entry.status === 'completed';
+    });
+  }, [maintenanceLog, selectedDateStr]);
+
   const handleCompleteTask = async (task, notes = '', followUpNeeded = false, followUpNote = '') => {
     if (!initials) {
       toast.error('Please select a staff member first');
-      return;
-    }
-
-    // Only allow completing tasks for today
-    if (!isToday) {
-      toast.error('Can only complete tasks for today');
       return;
     }
 
@@ -311,8 +313,8 @@ export default function MaintenanceView() {
                     key={task.id}
                     task={task}
                     completed={completedForDate.has(task.id)}
+                    completionInfo={getCompletionInfo(task.id)}
                     onComplete={handleCompleteTask}
-                    disabled={!isToday}
                   />
                 ))}
               </>
@@ -329,8 +331,8 @@ export default function MaintenanceView() {
                     key={task.id}
                     task={task}
                     completed={completedForDate.has(task.id)}
+                    completionInfo={getCompletionInfo(task.id)}
                     onComplete={handleCompleteTask}
-                    disabled={!isToday}
                   />
                 ))}
               </>
@@ -347,8 +349,8 @@ export default function MaintenanceView() {
                     key={task.id}
                     task={task}
                     completed={completedForDate.has(task.id)}
+                    completionInfo={getCompletionInfo(task.id)}
                     onComplete={handleCompleteTask}
-                    disabled={!isToday}
                   />
                 ))}
               </>
@@ -523,8 +525,9 @@ export default function MaintenanceView() {
   );
 }
 
-function TaskItem({ task, completed, onComplete, disabled = false }) {
-  const [showNotes, setShowNotes] = useState(false);
+function TaskItem({ task, completed, completionInfo, onComplete }) {
+  const [expanded, setExpanded] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [notes, setNotes] = useState('');
   const [followUpNeeded, setFollowUpNeeded] = useState(false);
   const [followUpNote, setFollowUpNote] = useState('');
@@ -534,16 +537,40 @@ function TaskItem({ task, completed, onComplete, disabled = false }) {
     setLoading(true);
     await onComplete(task, notes, followUpNeeded, followUpNote);
     setLoading(false);
-    setShowNotes(false);
+    setExpanded(false);
+    setIsEditing(false);
     setNotes('');
     setFollowUpNeeded(false);
     setFollowUpNote('');
   };
 
+  const handleStartEdit = () => {
+    // Pre-fill with existing completion info if re-completing
+    if (completionInfo) {
+      setNotes(completionInfo.notes || '');
+      setFollowUpNeeded(completionInfo.follow_up_needed === 'TRUE');
+      setFollowUpNote(completionInfo.follow_up_note || '');
+    }
+    setIsEditing(true);
+    setExpanded(true);
+  };
+
+  const handleToggleExpand = () => {
+    if (!expanded) {
+      setExpanded(true);
+      setIsEditing(false);
+    } else if (!isEditing) {
+      setExpanded(false);
+    }
+  };
+
   return (
-    <div className={`px-4 py-3 ${completed ? 'bg-green-50' : ''} ${disabled ? 'opacity-60' : ''}`}>
+    <div className={`px-4 py-3 ${completed ? 'bg-green-50' : ''}`}>
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div
+          className="flex items-center gap-3 flex-1 cursor-pointer"
+          onClick={handleToggleExpand}
+        >
           <div
             className={`
               w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0
@@ -556,78 +583,147 @@ function TaskItem({ task, completed, onComplete, disabled = false }) {
               </svg>
             )}
           </div>
-          <div>
-            <span className={`text-sm ${completed ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
+          <div className="flex-1">
+            <span className={`text-sm ${completed ? 'text-green-800' : 'text-gray-900'}`}>
               {task.label}
             </span>
             {task.courts && task.courts !== 'all' && (
               <span className="text-xs text-gray-500 ml-2">({task.courts})</span>
             )}
-            {task.estimated_minutes && (
+            {task.estimated_minutes && !completed && (
               <span className="text-xs text-gray-400 ml-2">~{task.estimated_minutes}min</span>
             )}
+            {completed && completionInfo && (
+              <span className="text-xs text-green-600 ml-2">
+                by {completionInfo.completed_by}
+                {completionInfo.follow_up_needed === 'TRUE' && (
+                  <span className="ml-1 text-amber-600">• Follow-up needed</span>
+                )}
+              </span>
+            )}
           </div>
+          {/* Expand indicator */}
+          <svg
+            className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
         </div>
 
-        {!completed && !disabled && (
+        {!completed && !isEditing && (
           <Button
             size="sm"
             variant="primary"
-            onClick={() => showNotes ? handleComplete() : setShowNotes(true)}
-            loading={loading}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleStartEdit();
+            }}
           >
-            {showNotes ? 'Complete' : 'Mark Done'}
+            Mark Done
+          </Button>
+        )}
+
+        {completed && !isEditing && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleStartEdit();
+            }}
+          >
+            Update
           </Button>
         )}
       </div>
 
-      {showNotes && !completed && (
+      {/* Expanded view - shows completion info or edit form */}
+      {expanded && (
         <div className="mt-3 ml-9 space-y-3">
           {task.instructions && (
             <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded">{task.instructions}</p>
           )}
 
-          <Textarea
-            placeholder="Add notes (optional)..."
-            value={notes}
-            onChange={setNotes}
-            rows={2}
-          />
-
-          {/* Follow-up section */}
-          <div className="flex items-start gap-2">
-            <input
-              type="checkbox"
-              id={`followup-${task.id}`}
-              checked={followUpNeeded}
-              onChange={(e) => setFollowUpNeeded(e.target.checked)}
-              className="mt-1 h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
-            />
-            <label htmlFor={`followup-${task.id}`} className="text-sm text-gray-700">
-              Needs Follow Up
-            </label>
-          </div>
-
-          {followUpNeeded && (
-            <Textarea
-              placeholder="Describe the follow-up needed..."
-              value={followUpNote}
-              onChange={setFollowUpNote}
-              rows={2}
-            />
+          {/* Show completion details when not editing */}
+          {completed && !isEditing && completionInfo && (
+            <div className="text-sm space-y-1 bg-green-50 p-3 rounded border border-green-200">
+              <div className="text-green-800">
+                <span className="font-medium">Completed by:</span> {completionInfo.completed_by}
+              </div>
+              {completionInfo.notes && (
+                <div className="text-green-700">
+                  <span className="font-medium">Notes:</span> {completionInfo.notes}
+                </div>
+              )}
+              {completionInfo.follow_up_needed === 'TRUE' && (
+                <div className="text-amber-700 bg-amber-50 p-2 rounded mt-2">
+                  <span className="font-medium">Follow-up needed:</span> {completionInfo.follow_up_note || 'Yes'}
+                </div>
+              )}
+            </div>
           )}
 
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              setShowNotes(false);
-              setFollowUpNeeded(false);
-              setFollowUpNote('');
-            }}
-          >
-            Cancel
-          </Button>
+          {/* Edit form */}
+          {isEditing && (
+            <>
+              <Textarea
+                placeholder="Add notes (optional)..."
+                value={notes}
+                onChange={setNotes}
+                rows={2}
+              />
+
+              {/* Follow-up section */}
+              <div className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  id={`followup-${task.id}`}
+                  checked={followUpNeeded}
+                  onChange={(e) => setFollowUpNeeded(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                />
+                <label htmlFor={`followup-${task.id}`} className="text-sm text-gray-700">
+                  Needs Follow Up
+                </label>
+              </div>
+
+              {followUpNeeded && (
+                <Textarea
+                  placeholder="Describe the follow-up needed..."
+                  value={followUpNote}
+                  onChange={setFollowUpNote}
+                  rows={2}
+                />
+              )}
+
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={handleComplete}
+                  loading={loading}
+                >
+                  {completed ? 'Update Entry' : 'Complete'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setIsEditing(false);
+                    setExpanded(false);
+                    setNotes('');
+                    setFollowUpNeeded(false);
+                    setFollowUpNote('');
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
