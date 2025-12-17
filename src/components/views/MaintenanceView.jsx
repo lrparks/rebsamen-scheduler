@@ -43,15 +43,20 @@ export default function MaintenanceView() {
   const [tasks, setTasks] = useState([]);
   const [maintenanceLog, setMaintenanceLog] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [completedToday, setCompletedToday] = useState(new Set());
+  const [completedForDate, setCompletedForDate] = useState(new Set());
+
+  // Selected date for checklist (can view yesterday/tomorrow)
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
 
   // History filters
   const [historyWeekStart, setHistoryWeekStart] = useState(() => getWeekStart(new Date()));
   const [showFollowUpOnly, setShowFollowUpOnly] = useState(false);
 
   const today = formatDateISO(new Date());
-  const dayOfWeek = new Date().getDay(); // 0=Sun, 6=Sat
-  const todayDayOfMonth = new Date().getDate();
+  const selectedDateStr = formatDateISO(selectedDate);
+  const selectedDayOfWeek = selectedDate.getDay(); // 0=Sun, 6=Sat
+  const selectedDayOfMonth = selectedDate.getDate();
+  const isToday = selectedDateStr === today;
 
   // Load tasks and maintenance log
   useEffect(() => {
@@ -66,16 +71,6 @@ export default function MaintenanceView() {
         const activeTasks = tasksData.filter(t => t.is_active === 'TRUE');
         setTasks(activeTasks);
         setMaintenanceLog(logData);
-
-        // Check what's been completed today
-        const todayCompleted = new Set();
-        logData.forEach(entry => {
-          const entryDate = entry.date || entry.completed_date;
-          if (entryDate === today && entry.status === 'completed') {
-            todayCompleted.add(entry.task_id);
-          }
-        });
-        setCompletedToday(todayCompleted);
       } catch (error) {
         console.error('[MaintenanceView] Error loading data:', error);
         toast.error('Failed to load maintenance data');
@@ -85,7 +80,40 @@ export default function MaintenanceView() {
     };
 
     loadData();
-  }, [today]);
+  }, []);
+
+  // Update completed tasks when selectedDate or log changes
+  useEffect(() => {
+    const completed = new Set();
+    maintenanceLog.forEach(entry => {
+      const entryDate = entry.date || entry.completed_date;
+      if (entryDate === selectedDateStr && entry.status === 'completed') {
+        completed.add(entry.task_id);
+      }
+    });
+    setCompletedForDate(completed);
+  }, [selectedDateStr, maintenanceLog]);
+
+  // Day navigation for checklist
+  const goToPrevDay = useCallback(() => {
+    setSelectedDate(prev => {
+      const newDate = new Date(prev);
+      newDate.setDate(newDate.getDate() - 1);
+      return newDate;
+    });
+  }, []);
+
+  const goToNextDay = useCallback(() => {
+    setSelectedDate(prev => {
+      const newDate = new Date(prev);
+      newDate.setDate(newDate.getDate() + 1);
+      return newDate;
+    });
+  }, []);
+
+  const goToToday = useCallback(() => {
+    setSelectedDate(new Date());
+  }, []);
 
   // Filter tasks by frequency
   const dailyTasks = useMemo(() => {
@@ -120,19 +148,25 @@ export default function MaintenanceView() {
     }));
   }, [tasks]);
 
-  // Filter today's applicable weekly tasks
-  const todaysWeeklyTasks = useMemo(() => {
-    return weeklyTasks.filter(t => t.day === dayOfWeek);
-  }, [weeklyTasks, dayOfWeek]);
+  // Filter selected day's applicable weekly tasks
+  const selectedDaysWeeklyTasks = useMemo(() => {
+    return weeklyTasks.filter(t => t.day === selectedDayOfWeek);
+  }, [weeklyTasks, selectedDayOfWeek]);
 
-  // Filter today's applicable monthly tasks
-  const todaysMonthlyTasks = useMemo(() => {
-    return monthlyTasks.filter(t => t.dayOfMonth === todayDayOfMonth);
-  }, [monthlyTasks, todayDayOfMonth]);
+  // Filter selected day's applicable monthly tasks
+  const selectedDaysMonthlyTasks = useMemo(() => {
+    return monthlyTasks.filter(t => t.dayOfMonth === selectedDayOfMonth);
+  }, [monthlyTasks, selectedDayOfMonth]);
 
   const handleCompleteTask = async (task, notes = '', followUpNeeded = false, followUpNote = '') => {
     if (!initials) {
       toast.error('Please select a staff member first');
+      return;
+    }
+
+    // Only allow completing tasks for today
+    if (!isToday) {
+      toast.error('Can only complete tasks for today');
       return;
     }
 
@@ -141,7 +175,7 @@ export default function MaintenanceView() {
         task_id: task.id,
         task_name: task.label,
         court: task.courts || 'all',
-        date: today,
+        date: selectedDateStr,
         completed_by: initials,
         completed_at: new Date().toISOString(),
         status: 'completed',
@@ -153,7 +187,7 @@ export default function MaintenanceView() {
       const result = await logMaintenance(logEntry);
 
       if (result.success) {
-        setCompletedToday(prev => new Set([...prev, task.id]));
+        setCompletedForDate(prev => new Set([...prev, task.id]));
         setMaintenanceLog(prev => [...prev, logEntry]);
         toast.success(`Completed: ${task.label}`);
       } else {
@@ -233,11 +267,37 @@ export default function MaintenanceView() {
       <h2 className="text-xl font-semibold text-gray-900">Maintenance Dashboard</h2>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Today's Checklist */}
+        {/* Checklist */}
         <div className="bg-white rounded-lg border border-gray-200">
           <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-            <h3 className="font-medium text-gray-900">Today's Checklist</h3>
-            <p className="text-sm text-gray-500">{formatDateDisplay(today)} ({DAYS[dayOfWeek]})</p>
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium text-gray-900">
+                {isToday ? "Today's Checklist" : 'Checklist'}
+              </h3>
+              <div className="flex items-center gap-2">
+                <IconButton onClick={goToPrevDay} aria-label="Previous day">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </IconButton>
+                <button
+                  onClick={goToToday}
+                  className={`px-3 py-1 text-sm rounded ${
+                    isToday
+                      ? 'bg-green-700 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {formatDateDisplay(selectedDateStr)}
+                </button>
+                <IconButton onClick={goToNextDay} aria-label="Next day">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </IconButton>
+              </div>
+            </div>
+            <p className="text-sm text-gray-500">{DAYS[selectedDayOfWeek]}</p>
           </div>
           <div className="divide-y divide-gray-100">
             {/* Daily Tasks */}
@@ -250,50 +310,53 @@ export default function MaintenanceView() {
                   <TaskItem
                     key={task.id}
                     task={task}
-                    completed={completedToday.has(task.id)}
+                    completed={completedForDate.has(task.id)}
                     onComplete={handleCompleteTask}
+                    disabled={!isToday}
                   />
                 ))}
               </>
             )}
 
-            {/* Today's Weekly Tasks */}
-            {todaysWeeklyTasks.length > 0 && (
+            {/* Weekly Tasks for selected day */}
+            {selectedDaysWeeklyTasks.length > 0 && (
               <>
                 <div className="px-4 py-2 bg-blue-50 text-sm font-medium text-blue-800">
-                  Weekly Tasks Due Today
+                  Weekly Tasks ({DAYS[selectedDayOfWeek]})
                 </div>
-                {todaysWeeklyTasks.map(task => (
+                {selectedDaysWeeklyTasks.map(task => (
                   <TaskItem
                     key={task.id}
                     task={task}
-                    completed={completedToday.has(task.id)}
+                    completed={completedForDate.has(task.id)}
                     onComplete={handleCompleteTask}
+                    disabled={!isToday}
                   />
                 ))}
               </>
             )}
 
-            {/* Today's Monthly Tasks */}
-            {todaysMonthlyTasks.length > 0 && (
+            {/* Monthly Tasks for selected day */}
+            {selectedDaysMonthlyTasks.length > 0 && (
               <>
                 <div className="px-4 py-2 bg-purple-50 text-sm font-medium text-purple-800">
-                  Monthly Tasks Due Today
+                  Monthly Tasks (Day {selectedDayOfMonth})
                 </div>
-                {todaysMonthlyTasks.map(task => (
+                {selectedDaysMonthlyTasks.map(task => (
                   <TaskItem
                     key={task.id}
                     task={task}
-                    completed={completedToday.has(task.id)}
+                    completed={completedForDate.has(task.id)}
                     onComplete={handleCompleteTask}
+                    disabled={!isToday}
                   />
                 ))}
               </>
             )}
 
-            {dailyTasks.length === 0 && todaysWeeklyTasks.length === 0 && todaysMonthlyTasks.length === 0 && (
+            {dailyTasks.length === 0 && selectedDaysWeeklyTasks.length === 0 && selectedDaysMonthlyTasks.length === 0 && (
               <div className="px-4 py-8 text-center text-gray-500">
-                No tasks scheduled for today
+                No tasks scheduled for {isToday ? 'today' : 'this day'}
               </div>
             )}
           </div>
@@ -357,47 +420,45 @@ export default function MaintenanceView() {
       {/* Maintenance History */}
       <div className="bg-white rounded-lg border border-gray-200">
         <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-          <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <h3 className="font-medium text-gray-900">Maintenance History</h3>
 
-            <div className="flex items-center gap-4">
-              {/* Follow-up filter */}
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showFollowUpOnly}
-                  onChange={(e) => setShowFollowUpOnly(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
-                />
-                <span className="text-sm text-gray-700">Needs Follow-up Only</span>
-              </label>
-
-              {/* Week navigation */}
-              <div className="flex items-center gap-2">
-                <IconButton onClick={goToPrevWeek} aria-label="Previous week">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </IconButton>
-                <button
-                  onClick={goToThisWeek}
-                  className={`px-3 py-1 text-sm rounded ${
-                    isCurrentWeek
-                      ? 'bg-green-700 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {formatWeekRange(historyWeekStart)}
-                </button>
-                <IconButton onClick={goToNextWeek} aria-label="Next week">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </IconButton>
-              </div>
-
-              <span className="text-sm text-gray-500">({recentHistory.length})</span>
+            {/* Week navigation */}
+            <div className="flex items-center gap-2">
+              <IconButton onClick={goToPrevWeek} aria-label="Previous week">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </IconButton>
+              <button
+                onClick={goToThisWeek}
+                className={`px-3 py-1 text-sm rounded ${
+                  isCurrentWeek
+                    ? 'bg-green-700 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {formatWeekRange(historyWeekStart)}
+              </button>
+              <IconButton onClick={goToNextWeek} aria-label="Next week">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </IconButton>
             </div>
+
+            {/* Follow-up filter */}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showFollowUpOnly}
+                onChange={(e) => setShowFollowUpOnly(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+              />
+              <span className="text-sm text-gray-700">Needs Follow-up Only</span>
+            </label>
+
+            <span className="text-sm text-gray-500 ml-auto">({recentHistory.length})</span>
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -462,7 +523,7 @@ export default function MaintenanceView() {
   );
 }
 
-function TaskItem({ task, completed, onComplete }) {
+function TaskItem({ task, completed, onComplete, disabled = false }) {
   const [showNotes, setShowNotes] = useState(false);
   const [notes, setNotes] = useState('');
   const [followUpNeeded, setFollowUpNeeded] = useState(false);
@@ -480,7 +541,7 @@ function TaskItem({ task, completed, onComplete }) {
   };
 
   return (
-    <div className={`px-4 py-3 ${completed ? 'bg-green-50' : ''}`}>
+    <div className={`px-4 py-3 ${completed ? 'bg-green-50' : ''} ${disabled ? 'opacity-60' : ''}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div
@@ -508,7 +569,7 @@ function TaskItem({ task, completed, onComplete }) {
           </div>
         </div>
 
-        {!completed && (
+        {!completed && !disabled && (
           <Button
             size="sm"
             variant="primary"
