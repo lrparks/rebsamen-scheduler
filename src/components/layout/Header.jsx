@@ -19,7 +19,7 @@ export default function Header({ onStaffClick, onRefresh }) {
   };
 
   return (
-    <header className="bg-primary text-white shadow-lg">
+    <header className="bg-green-700 text-white shadow-lg">
       <div className="flex items-center justify-between px-4 py-3">
         {/* Logo / Title */}
         <div className="flex items-center gap-3">

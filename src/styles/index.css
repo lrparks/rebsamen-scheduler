@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 
-/* Custom properties */
-:root {
+/* Custom theme for Tailwind v4 */
+@theme {
   --color-primary: #166534;
   --color-primary-light: #22c55e;
   --color-danger: #DC2626;
@@ -45,73 +45,6 @@ body {
   background: #a8a8a8;
 }
 
-/* Grid scroll behavior */
-.grid-container {
-  scroll-behavior: smooth;
-}
-
-/* Sticky columns and headers */
-.sticky-column {
-  position: sticky;
-  left: 0;
-  z-index: 10;
-  background: inherit;
-}
-
-.sticky-header {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  background: inherit;
-}
-
-/* Print styles */
-@media print {
-  .no-print {
-    display: none !important;
-  }
-
-  body {
-    background: white;
-  }
-
-  .print-full-width {
-    width: 100% !important;
-    max-width: none !important;
-  }
-}
-
-/* Animation utilities */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.2s ease-out;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(100%);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-.animate-slide-in {
-  animation: slideIn 0.3s ease-out;
-}
-
 /* Focus visible styles */
 :focus-visible {
   outline: 2px solid var(--color-primary);
@@ -143,48 +76,6 @@ tbody tr:hover {
   background-color: rgba(0, 0, 0, 0.02);
 }
 
-/* Modal backdrop blur */
-.modal-backdrop {
-  backdrop-filter: blur(2px);
-}
-
-/* Toast animations */
-.toast-enter {
-  transform: translateX(100%);
-  opacity: 0;
-}
-
-.toast-enter-active {
-  transform: translateX(0);
-  opacity: 1;
-  transition: all 0.3s ease-out;
-}
-
-.toast-exit {
-  transform: translateX(0);
-  opacity: 1;
-}
-
-.toast-exit-active {
-  transform: translateX(100%);
-  opacity: 0;
-  transition: all 0.3s ease-in;
-}
-
-/* Loading spinner */
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.loading-spinner {
-  animation: spin 1s linear infinite;
-}
-
 /* Custom select arrow */
 select {
   appearance: none;
@@ -194,12 +85,9 @@ select {
   padding-right: 2.5rem;
 }
 
-/* Mobile responsive adjustments */
-@media (max-width: 640px) {
-  .mobile-full-width {
-    width: 100vw;
-    margin-left: -1rem;
-    margin-right: -1rem;
-    border-radius: 0;
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
   }
 }
