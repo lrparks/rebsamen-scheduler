@@ -155,6 +155,16 @@ export async function fetchMaintenanceLog() {
 }
 
 /**
+ * Fetch maintenance tasks (task definitions)
+ * @returns {Promise<Array>}
+ */
+export async function fetchMaintenanceTasks() {
+  const data = await fetchCSV(CONFIG.CSV_URLS.maintenanceTasks);
+  console.log('[API] Fetched maintenance tasks:', data.length);
+  return data;
+}
+
+/**
  * Fetch tournaments data
  * @returns {Promise<Array>}
  */

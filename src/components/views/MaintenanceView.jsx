@@ -1,10 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useStaffContext } from '../../context/StaffContext.jsx';
-import { logMaintenance, fetchMaintenanceLog } from '../../utils/api.js';
-import { formatDateDisplay, formatDateISO, getStartOfWeek } from '../../utils/dateHelpers.js';
-import { useCourts } from '../../hooks/useCourts.js';
+import { logMaintenance, fetchMaintenanceLog, fetchMaintenanceTasks } from '../../utils/api.js';
+import { formatDateDisplay, formatDateISO } from '../../utils/dateHelpers.js';
 import Button, { IconButton } from '../common/Button.jsx';
-import Select from '../common/Select.jsx';
 import { Textarea } from '../common/Input.jsx';
 import { useToast } from '../common/Toast.jsx';
 
@@ -36,13 +34,13 @@ function formatWeekRange(weekStart) {
 }
 
 /**
- * Maintenance dashboard view
+ * Maintenance dashboard view - CSV-driven tasks
  */
 export default function MaintenanceView() {
   const { initials } = useStaffContext();
-  const { courts, courtOptions } = useCourts();
   const toast = useToast();
 
+  const [tasks, setTasks] = useState([]);
   const [maintenanceLog, setMaintenanceLog] = useState([]);
   const [loading, setLoading] = useState(true);
   const [completedToday, setCompletedToday] = useState(new Set());
@@ -53,43 +51,25 @@ export default function MaintenanceView() {
 
   const today = formatDateISO(new Date());
   const dayOfWeek = new Date().getDay(); // 0=Sun, 6=Sat
+  const todayDayOfMonth = new Date().getDate();
 
-  // Daily checklist items
-  const dailyTasks = [
-    { id: 'sweep', label: 'Sweep all courts', category: 'cleaning' },
-    { id: 'trash', label: 'Empty trash bins', category: 'cleaning' },
-    { id: 'nets', label: 'Check net tension', category: 'equipment' },
-    { id: 'lines', label: 'Inspect court lines', category: 'inspection' },
-    { id: 'lights', label: 'Test court lights', category: 'equipment' },
-    { id: 'water', label: 'Refill water stations', category: 'amenities' },
-  ];
-
-  // Weekly tasks
-  const weeklyTasks = [
-    { id: 'deep_clean', label: 'Deep clean courts', day: 1, category: 'cleaning' },
-    { id: 'windscreens', label: 'Inspect windscreens', day: 2, category: 'inspection' },
-    { id: 'benches', label: 'Clean benches and seating', day: 3, category: 'cleaning' },
-    { id: 'signage', label: 'Check signage', day: 4, category: 'inspection' },
-    { id: 'inventory', label: 'Equipment inventory', day: 5, category: 'equipment' },
-  ];
-
-  // Monthly tasks
-  const monthlyTasks = [
-    { id: 'surface_inspect', label: 'Surface damage inspection', dayOfMonth: 1, category: 'inspection' },
-    { id: 'paint_touch', label: 'Touch up court paint', dayOfMonth: 15, category: 'maintenance' },
-    { id: 'equipment_service', label: 'Equipment maintenance', dayOfMonth: 20, category: 'equipment' },
-  ];
-
-  // Load maintenance log
+  // Load tasks and maintenance log
   useEffect(() => {
-    const loadLog = async () => {
+    const loadData = async () => {
       try {
-        const data = await fetchMaintenanceLog();
-        setMaintenanceLog(data);
+        const [tasksData, logData] = await Promise.all([
+          fetchMaintenanceTasks(),
+          fetchMaintenanceLog(),
+        ]);
+
+        // Filter to active tasks only
+        const activeTasks = tasksData.filter(t => t.is_active === 'TRUE');
+        setTasks(activeTasks);
+        setMaintenanceLog(logData);
 
         // Check what's been completed today
         const todayCompleted = new Set();
-        data.forEach(entry => {
+        logData.forEach(entry => {
           const entryDate = entry.date || entry.completed_date;
           if (entryDate === today && entry.status === 'completed') {
             todayCompleted.add(entry.task_id);
@@ -97,14 +77,58 @@ export default function MaintenanceView() {
         });
         setCompletedToday(todayCompleted);
       } catch (error) {
-        console.error('[MaintenanceView] Error loading log:', error);
+        console.error('[MaintenanceView] Error loading data:', error);
+        toast.error('Failed to load maintenance data');
       } finally {
         setLoading(false);
       }
     };
 
-    loadLog();
+    loadData();
   }, [today]);
+
+  // Filter tasks by frequency
+  const dailyTasks = useMemo(() => {
+    return tasks.filter(t => t.frequency === 'daily').map(t => ({
+      id: t.task_id,
+      label: t.task_name,
+      courts: t.courts,
+      instructions: t.instructions,
+      estimated_minutes: t.estimated_minutes,
+    }));
+  }, [tasks]);
+
+  const weeklyTasks = useMemo(() => {
+    return tasks.filter(t => t.frequency === 'weekly').map(t => ({
+      id: t.task_id,
+      label: t.task_name,
+      courts: t.courts,
+      instructions: t.instructions,
+      estimated_minutes: t.estimated_minutes,
+      day: parseInt(t.day_of_week, 10) || 0,
+    }));
+  }, [tasks]);
+
+  const monthlyTasks = useMemo(() => {
+    return tasks.filter(t => t.frequency === 'monthly').map(t => ({
+      id: t.task_id,
+      label: t.task_name,
+      courts: t.courts,
+      instructions: t.instructions,
+      estimated_minutes: t.estimated_minutes,
+      dayOfMonth: parseInt(t.day_of_month, 10) || 1,
+    }));
+  }, [tasks]);
+
+  // Filter today's applicable weekly tasks
+  const todaysWeeklyTasks = useMemo(() => {
+    return weeklyTasks.filter(t => t.day === dayOfWeek);
+  }, [weeklyTasks, dayOfWeek]);
+
+  // Filter today's applicable monthly tasks
+  const todaysMonthlyTasks = useMemo(() => {
+    return monthlyTasks.filter(t => t.dayOfMonth === todayDayOfMonth);
+  }, [monthlyTasks, todayDayOfMonth]);
 
   const handleCompleteTask = async (task, notes = '', followUpNeeded = false, followUpNote = '') => {
     if (!initials) {
@@ -116,8 +140,7 @@ export default function MaintenanceView() {
       const logEntry = {
         task_id: task.id,
         task_name: task.label,
-        category: task.category,
-        court: 'all',
+        court: task.courts || 'all',
         date: today,
         completed_by: initials,
         completed_at: new Date().toISOString(),
@@ -141,13 +164,6 @@ export default function MaintenanceView() {
       toast.error('Failed to log task');
     }
   };
-
-  // Filter today's applicable weekly tasks
-  const todaysWeeklyTasks = weeklyTasks.filter(t => t.day === dayOfWeek);
-
-  // Filter today's applicable monthly tasks
-  const todayDayOfMonth = new Date().getDate();
-  const todaysMonthlyTasks = monthlyTasks.filter(t => t.dayOfMonth === todayDayOfMonth);
 
   // Week navigation helpers
   const goToPrevWeek = useCallback(() => {
@@ -196,7 +212,6 @@ export default function MaintenanceView() {
         return true;
       })
       .sort((a, b) => {
-        // Support both completed_at (ISO) and completed_date/completed_time (CSV format)
         const dateA = a.completed_at || `${a.completed_date}T${a.completed_time || '00:00'}`;
         const dateB = b.completed_at || `${b.completed_date}T${b.completed_time || '00:00'}`;
         return new Date(dateB) - new Date(dateA);
@@ -211,6 +226,8 @@ export default function MaintenanceView() {
     );
   }
 
+  const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
   return (
     <div className="space-y-6 p-4">
       <h2 className="text-xl font-semibold text-gray-900">Maintenance Dashboard</h2>
@@ -220,18 +237,25 @@ export default function MaintenanceView() {
         <div className="bg-white rounded-lg border border-gray-200">
           <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
             <h3 className="font-medium text-gray-900">Today's Checklist</h3>
-            <p className="text-sm text-gray-500">{formatDateDisplay(today)}</p>
+            <p className="text-sm text-gray-500">{formatDateDisplay(today)} ({DAYS[dayOfWeek]})</p>
           </div>
           <div className="divide-y divide-gray-100">
             {/* Daily Tasks */}
-            {dailyTasks.map(task => (
-              <TaskItem
-                key={task.id}
-                task={task}
-                completed={completedToday.has(task.id)}
-                onComplete={handleCompleteTask}
-              />
-            ))}
+            {dailyTasks.length > 0 && (
+              <>
+                <div className="px-4 py-2 bg-gray-50 text-sm font-medium text-gray-700">
+                  Daily Tasks
+                </div>
+                {dailyTasks.map(task => (
+                  <TaskItem
+                    key={task.id}
+                    task={task}
+                    completed={completedToday.has(task.id)}
+                    onComplete={handleCompleteTask}
+                  />
+                ))}
+              </>
+            )}
 
             {/* Today's Weekly Tasks */}
             {todaysWeeklyTasks.length > 0 && (
@@ -266,39 +290,66 @@ export default function MaintenanceView() {
                 ))}
               </>
             )}
+
+            {dailyTasks.length === 0 && todaysWeeklyTasks.length === 0 && todaysMonthlyTasks.length === 0 && (
+              <div className="px-4 py-8 text-center text-gray-500">
+                No tasks scheduled for today
+              </div>
+            )}
           </div>
         </div>
 
         {/* Upcoming Tasks */}
         <div className="bg-white rounded-lg border border-gray-200">
           <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-            <h3 className="font-medium text-gray-900">Upcoming Scheduled Tasks</h3>
+            <h3 className="font-medium text-gray-900">Scheduled Tasks</h3>
           </div>
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
             {/* Weekly Tasks */}
-            <div className="px-4 py-2 bg-blue-50 text-sm font-medium text-blue-800">
-              Weekly Schedule
-            </div>
-            {weeklyTasks.map(task => {
-              const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-              return (
-                <div key={task.id} className="px-4 py-3 flex justify-between items-center">
-                  <span className="text-sm text-gray-900">{task.label}</span>
-                  <span className="text-xs text-gray-500">{days[task.day]}</span>
+            {weeklyTasks.length > 0 && (
+              <>
+                <div className="px-4 py-2 bg-blue-50 text-sm font-medium text-blue-800 sticky top-0">
+                  Weekly Schedule
                 </div>
-              );
-            })}
+                {weeklyTasks.map(task => (
+                  <div key={task.id} className="px-4 py-3 flex justify-between items-start">
+                    <div className="flex-1">
+                      <span className="text-sm text-gray-900">{task.label}</span>
+                      {task.courts && task.courts !== 'all' && (
+                        <span className="text-xs text-gray-500 ml-2">({task.courts})</span>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-500 whitespace-nowrap ml-2">{DAYS[task.day]}</span>
+                  </div>
+                ))}
+              </>
+            )}
 
             {/* Monthly Tasks */}
-            <div className="px-4 py-2 bg-purple-50 text-sm font-medium text-purple-800">
-              Monthly Schedule
-            </div>
-            {monthlyTasks.map(task => (
-              <div key={task.id} className="px-4 py-3 flex justify-between items-center">
-                <span className="text-sm text-gray-900">{task.label}</span>
-                <span className="text-xs text-gray-500">Day {task.dayOfMonth}</span>
+            {monthlyTasks.length > 0 && (
+              <>
+                <div className="px-4 py-2 bg-purple-50 text-sm font-medium text-purple-800 sticky top-0">
+                  Monthly Schedule
+                </div>
+                {monthlyTasks.map(task => (
+                  <div key={task.id} className="px-4 py-3 flex justify-between items-start">
+                    <div className="flex-1">
+                      <span className="text-sm text-gray-900">{task.label}</span>
+                      {task.courts && task.courts !== 'all' && (
+                        <span className="text-xs text-gray-500 ml-2">({task.courts})</span>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-500 whitespace-nowrap ml-2">Day {task.dayOfMonth}</span>
+                  </div>
+                ))}
+              </>
+            )}
+
+            {weeklyTasks.length === 0 && monthlyTasks.length === 0 && (
+              <div className="px-4 py-8 text-center text-gray-500">
+                No scheduled tasks configured
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>
@@ -353,53 +404,32 @@ export default function MaintenanceView() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Date
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Task
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Category
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  By
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Notes
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Follow Up
-                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Task</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Courts</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">By</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Follow Up</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {recentHistory.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                    No maintenance history found
+                    No maintenance history found for this week
                   </td>
                 </tr>
               ) : (
                 recentHistory.map((entry, index) => (
-                  <tr key={`${entry.task_id}-${entry.completed_at}-${index}`} className={entry.follow_up_needed === 'TRUE' ? 'bg-amber-50' : ''}>
+                  <tr key={`${entry.task_id}-${entry.completed_at || entry.log_id}-${index}`} className={entry.follow_up_needed === 'TRUE' ? 'bg-amber-50' : ''}>
                     <td className="px-4 py-3 text-sm text-gray-900">
                       {formatDateDisplay(entry.date || entry.completed_date)}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900">
                       {entry.task_name || entry.task_id}
                     </td>
-                    <td className="px-4 py-3 text-sm">
-                      <span className={`
-                        px-2 py-1 text-xs font-medium rounded-full
-                        ${entry.category === 'cleaning' ? 'bg-blue-100 text-blue-800' : ''}
-                        ${entry.category === 'inspection' ? 'bg-yellow-100 text-yellow-800' : ''}
-                        ${entry.category === 'equipment' ? 'bg-green-100 text-green-800' : ''}
-                        ${entry.category === 'maintenance' ? 'bg-purple-100 text-purple-800' : ''}
-                        ${entry.category === 'amenities' ? 'bg-gray-100 text-gray-800' : ''}
-                      `}>
-                        {entry.category || '-'}
-                      </span>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      {entry.court || 'all'}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900">
                       {entry.completed_by}
@@ -455,7 +485,7 @@ function TaskItem({ task, completed, onComplete }) {
         <div className="flex items-center gap-3">
           <div
             className={`
-              w-6 h-6 rounded-full flex items-center justify-center
+              w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0
               ${completed ? 'bg-green-500 text-white' : 'border-2 border-gray-300'}
             `}
           >
@@ -465,9 +495,17 @@ function TaskItem({ task, completed, onComplete }) {
               </svg>
             )}
           </div>
-          <span className={`text-sm ${completed ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
-            {task.label}
-          </span>
+          <div>
+            <span className={`text-sm ${completed ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
+              {task.label}
+            </span>
+            {task.courts && task.courts !== 'all' && (
+              <span className="text-xs text-gray-500 ml-2">({task.courts})</span>
+            )}
+            {task.estimated_minutes && (
+              <span className="text-xs text-gray-400 ml-2">~{task.estimated_minutes}min</span>
+            )}
+          </div>
         </div>
 
         {!completed && (
@@ -484,6 +522,10 @@ function TaskItem({ task, completed, onComplete }) {
 
       {showNotes && !completed && (
         <div className="mt-3 ml-9 space-y-3">
+          {task.instructions && (
+            <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded">{task.instructions}</p>
+          )}
+
           <Textarea
             placeholder="Add notes (optional)..."
             value={notes}
