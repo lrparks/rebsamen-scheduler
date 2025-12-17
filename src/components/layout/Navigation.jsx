@@ -50,7 +50,7 @@ export default function Navigation({
               className={`
                 px-4 py-2 text-sm font-medium rounded-lg transition-colors
                 ${currentView === tab.id
-                  ? 'bg-primary text-white'
+                  ? 'bg-green-700 text-white'
                   : 'text-gray-600 hover:bg-gray-100'
                 }
               `}
@@ -89,7 +89,7 @@ export default function Navigation({
               type="date"
               value={selectedDate}
               onChange={handleDateInput}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
             />
 
             <span className="text-sm font-medium text-gray-700">

@@ -38,7 +38,7 @@ export default function Select({
           block w-full px-3 py-2 text-sm
           border rounded-lg shadow-sm
           bg-white
-          focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary
+          focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500
           disabled:bg-gray-100 disabled:cursor-not-allowed
           ${error ? 'border-red-500' : 'border-gray-300'}
         `}
@@ -105,7 +105,7 @@ export function MultiSelect({
               className={`
                 flex items-center gap-2 p-2 rounded cursor-pointer
                 hover:bg-gray-50
-                ${value.includes(option.value) ? 'bg-primary/10 text-primary' : ''}
+                ${value.includes(option.value) ? 'bg-green-100 text-green-700' : ''}
                 ${disabled ? 'cursor-not-allowed opacity-50' : ''}
               `}
             >
@@ -114,7 +114,7 @@ export function MultiSelect({
                 checked={value.includes(option.value)}
                 onChange={() => toggleOption(option.value)}
                 disabled={disabled}
-                className="rounded border-gray-300 text-primary focus:ring-primary"
+                className="rounded border-gray-300 text-green-600 focus:ring-green-500"
               />
               <span className="text-sm">{option.label}</span>
             </label>
