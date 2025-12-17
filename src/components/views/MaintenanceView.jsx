@@ -59,7 +59,8 @@ export default function MaintenanceView() {
         // Check what's been completed today
         const todayCompleted = new Set();
         data.forEach(entry => {
-          if (entry.date === today && entry.status === 'completed') {
+          const entryDate = entry.date || entry.completed_date;
+          if (entryDate === today && entry.status === 'completed') {
             todayCompleted.add(entry.task_id);
           }
         });
@@ -74,7 +75,7 @@ export default function MaintenanceView() {
     loadLog();
   }, [today]);
 
-  const handleCompleteTask = async (task, notes = '') => {
+  const handleCompleteTask = async (task, notes = '', followUpNeeded = false, followUpNote = '') => {
     if (!initials) {
       toast.error('Please select a staff member first');
       return;
@@ -85,11 +86,14 @@ export default function MaintenanceView() {
         task_id: task.id,
         task_name: task.label,
         category: task.category,
+        court: 'all',
         date: today,
         completed_by: initials,
         completed_at: new Date().toISOString(),
         status: 'completed',
         notes: notes,
+        follow_up_needed: followUpNeeded ? 'TRUE' : 'FALSE',
+        follow_up_note: followUpNote,
       };
 
       const result = await logMaintenance(logEntry);
@@ -118,7 +122,12 @@ export default function MaintenanceView() {
   const recentHistory = useMemo(() => {
     return maintenanceLog
       .filter(entry => entry.status === 'completed')
-      .sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at))
+      .sort((a, b) => {
+        // Support both completed_at (ISO) and completed_date/completed_time (CSV format)
+        const dateA = a.completed_at || `${a.completed_date}T${a.completed_time || '00:00'}`;
+        const dateB = b.completed_at || `${b.completed_date}T${b.completed_time || '00:00'}`;
+        return new Date(dateB) - new Date(dateA);
+      })
       .slice(0, 20);
   }, [maintenanceLog]);
 
@@ -241,28 +250,31 @@ export default function MaintenanceView() {
                   Category
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Completed By
+                  By
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Notes
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Follow Up
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {recentHistory.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                     No maintenance history found
                   </td>
                 </tr>
               ) : (
                 recentHistory.map((entry, index) => (
-                  <tr key={`${entry.task_id}-${entry.completed_at}-${index}`}>
+                  <tr key={`${entry.task_id}-${entry.completed_at}-${index}`} className={entry.follow_up_needed === 'TRUE' ? 'bg-amber-50' : ''}>
                     <td className="px-4 py-3 text-sm text-gray-900">
-                      {formatDateDisplay(entry.date)}
+                      {formatDateDisplay(entry.date || entry.completed_date)}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900">
-                      {entry.task_name}
+                      {entry.task_name || entry.task_id}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <span className={`
@@ -273,14 +285,28 @@ export default function MaintenanceView() {
                         ${entry.category === 'maintenance' ? 'bg-purple-100 text-purple-800' : ''}
                         ${entry.category === 'amenities' ? 'bg-gray-100 text-gray-800' : ''}
                       `}>
-                        {entry.category}
+                        {entry.category || '-'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900">
                       {entry.completed_by}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">
+                    <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate" title={entry.notes}>
                       {entry.notes || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {entry.follow_up_needed === 'TRUE' ? (
+                        <div>
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-amber-100 text-amber-800">
+                            Needs Follow Up
+                          </span>
+                          {entry.follow_up_note && (
+                            <p className="mt-1 text-xs text-amber-700">{entry.follow_up_note}</p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -296,14 +322,18 @@ export default function MaintenanceView() {
 function TaskItem({ task, completed, onComplete }) {
   const [showNotes, setShowNotes] = useState(false);
   const [notes, setNotes] = useState('');
+  const [followUpNeeded, setFollowUpNeeded] = useState(false);
+  const [followUpNote, setFollowUpNote] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleComplete = async () => {
     setLoading(true);
-    await onComplete(task, notes);
+    await onComplete(task, notes, followUpNeeded, followUpNote);
     setLoading(false);
     setShowNotes(false);
     setNotes('');
+    setFollowUpNeeded(false);
+    setFollowUpNote('');
   };
 
   return (
@@ -340,18 +370,45 @@ function TaskItem({ task, completed, onComplete }) {
       </div>
 
       {showNotes && !completed && (
-        <div className="mt-3 ml-9">
+        <div className="mt-3 ml-9 space-y-3">
           <Textarea
             placeholder="Add notes (optional)..."
             value={notes}
             onChange={setNotes}
             rows={2}
           />
+
+          {/* Follow-up section */}
+          <div className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              id={`followup-${task.id}`}
+              checked={followUpNeeded}
+              onChange={(e) => setFollowUpNeeded(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+            />
+            <label htmlFor={`followup-${task.id}`} className="text-sm text-gray-700">
+              Needs Follow Up
+            </label>
+          </div>
+
+          {followUpNeeded && (
+            <Textarea
+              placeholder="Describe the follow-up needed..."
+              value={followUpNote}
+              onChange={setFollowUpNote}
+              rows={2}
+            />
+          )}
+
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => setShowNotes(false)}
-            className="mt-2"
+            onClick={() => {
+              setShowNotes(false);
+              setFollowUpNeeded(false);
+              setFollowUpNote('');
+            }}
           >
             Cancel
           </Button>
