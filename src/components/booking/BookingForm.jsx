@@ -1,0 +1,235 @@
+import { useState, useEffect } from 'react';
+import Input from '../common/Input.jsx';
+import { Textarea } from '../common/Input.jsx';
+import Select, { MultiSelect } from '../common/Select.jsx';
+import DatePicker from '../common/DatePicker.jsx';
+import { getTimeSlots, getEndTimeOptions, formatTimeDisplay } from '../../utils/dateHelpers.js';
+import { calculateRate, isPrimeTime, isFreeBooking } from '../../utils/rates.js';
+import { BOOKING_TYPES, PAYMENT_STATUS, PAYMENT_METHODS, CONFIG } from '../../config.js';
+import { useCourts } from '../../hooks/useCourts.js';
+import { useContractors } from '../../hooks/useContractors.js';
+import { useTeams } from '../../hooks/useTeams.js';
+
+/**
+ * Booking form fields for create/edit
+ */
+export default function BookingForm({
+  formData,
+  onChange,
+  isEditing = false,
+}) {
+  const { courtOptions } = useCourts();
+  const { contractorOptions } = useContractors();
+  const { teamOptions } = useTeams();
+
+  const timeSlots = getTimeSlots();
+  const endTimeOptions = getEndTimeOptions(formData.timeStart);
+
+  // Auto-calculate rate when relevant fields change
+  useEffect(() => {
+    if (!isEditing && formData.date && formData.timeStart && formData.bookingType) {
+      const rate = calculateRate(formData.date, formData.timeStart, formData.bookingType);
+      const numCourts = formData.courts?.length || 1;
+      onChange({ paymentAmount: (rate * numCourts).toFixed(2) });
+    }
+  }, [formData.date, formData.timeStart, formData.bookingType, formData.courts?.length, isEditing]);
+
+  // Generate court options
+  const courts = courtOptions.length > 0 ? courtOptions : Array.from(
+    { length: CONFIG.TOTAL_COURTS },
+    (_, i) => ({
+      value: i + 1,
+      label: i + 1 === CONFIG.STADIUM_COURT_NUMBER ? 'Stadium' : `Court ${i + 1}`,
+    })
+  );
+
+  // Generate time options
+  const startTimeOptions = timeSlots.map(t => ({
+    value: t,
+    label: formatTimeDisplay(t),
+  }));
+
+  const endOptions = endTimeOptions.map(t => ({
+    value: t,
+    label: formatTimeDisplay(t),
+  }));
+
+  // Booking type options
+  const bookingTypeOptions = [
+    { value: BOOKING_TYPES.OPEN, label: 'Open Play (Walk-in)' },
+    { value: BOOKING_TYPES.CONTRACTOR, label: 'Contractor (Lesson)' },
+    { value: BOOKING_TYPES.TEAM_USTA, label: 'USTA League' },
+    { value: BOOKING_TYPES.TEAM_HS, label: 'High School Team' },
+    { value: BOOKING_TYPES.TEAM_COLLEGE, label: 'College Team' },
+    { value: BOOKING_TYPES.TEAM_OTHER, label: 'Other Team' },
+    { value: BOOKING_TYPES.TOURNAMENT, label: 'Tournament' },
+    { value: BOOKING_TYPES.MAINTENANCE, label: 'Maintenance' },
+    { value: BOOKING_TYPES.HOLD, label: 'Administrative Hold' },
+  ];
+
+  // Payment status options
+  const paymentStatusOptions = Object.values(PAYMENT_STATUS).map(s => ({
+    value: s,
+    label: s.charAt(0).toUpperCase() + s.slice(1),
+  }));
+
+  // Payment method options
+  const paymentMethodOptions = Object.values(PAYMENT_METHODS).map(m => ({
+    value: m,
+    label: m.toUpperCase(),
+  }));
+
+  const handleFieldChange = (field) => (value) => {
+    onChange({ [field]: value });
+  };
+
+  const isContractor = formData.bookingType === BOOKING_TYPES.CONTRACTOR;
+  const isTeam = formData.bookingType?.startsWith('team_');
+  const showPayment = !isFreeBooking(formData.bookingType);
+
+  return (
+    <div className="space-y-4">
+      {/* Date & Time */}
+      <div className="grid grid-cols-3 gap-3">
+        <DatePicker
+          label="Date"
+          value={formData.date}
+          onChange={handleFieldChange('date')}
+          min={new Date().toISOString().split('T')[0]}
+          required
+        />
+        <Select
+          label="Start Time"
+          value={formData.timeStart}
+          onChange={handleFieldChange('timeStart')}
+          options={startTimeOptions}
+          required
+        />
+        <Select
+          label="End Time"
+          value={formData.timeEnd}
+          onChange={handleFieldChange('timeEnd')}
+          options={endOptions}
+          required
+        />
+      </div>
+
+      {/* Court Selection */}
+      {isEditing ? (
+        <Select
+          label="Court"
+          value={formData.court}
+          onChange={handleFieldChange('court')}
+          options={courts}
+          required
+        />
+      ) : (
+        <MultiSelect
+          label="Courts (select multiple for group booking)"
+          value={formData.courts || []}
+          onChange={handleFieldChange('courts')}
+          options={courts}
+          required
+        />
+      )}
+
+      {/* Booking Type */}
+      <Select
+        label="Booking Type"
+        value={formData.bookingType}
+        onChange={handleFieldChange('bookingType')}
+        options={bookingTypeOptions}
+        required
+      />
+
+      {/* Contractor Selection */}
+      {isContractor && (
+        <Select
+          label="Contractor"
+          value={formData.entityId}
+          onChange={handleFieldChange('entityId')}
+          options={contractorOptions}
+          placeholder="Select contractor..."
+          required
+        />
+      )}
+
+      {/* Team Selection */}
+      {isTeam && (
+        <Select
+          label="Team"
+          value={formData.entityId}
+          onChange={handleFieldChange('entityId')}
+          options={teamOptions}
+          placeholder="Select team..."
+          required
+        />
+      )}
+
+      {/* Customer Info */}
+      <div className="grid grid-cols-2 gap-3">
+        <Input
+          label="Customer Name"
+          value={formData.customerName}
+          onChange={handleFieldChange('customerName')}
+          placeholder="Enter customer name"
+          required={formData.bookingType === BOOKING_TYPES.OPEN}
+        />
+        <Input
+          label="Phone Number"
+          type="tel"
+          value={formData.customerPhone}
+          onChange={handleFieldChange('customerPhone')}
+          placeholder="(501) 555-1234"
+        />
+      </div>
+
+      {/* Payment Info */}
+      {showPayment && (
+        <div className="border-t border-gray-200 pt-4 space-y-4">
+          <h4 className="text-sm font-medium text-gray-700">Payment Information</h4>
+
+          {/* Rate Info */}
+          <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-800">
+            {isPrimeTime(formData.date, formData.timeStart)
+              ? 'Prime Time Rate: $12.00 per court'
+              : 'Non-Prime Rate: $10.00 per court'}
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <Select
+              label="Payment Status"
+              value={formData.paymentStatus}
+              onChange={handleFieldChange('paymentStatus')}
+              options={paymentStatusOptions}
+            />
+            <Input
+              label="Amount ($)"
+              type="number"
+              value={formData.paymentAmount}
+              onChange={handleFieldChange('paymentAmount')}
+              min="0"
+              step="0.01"
+            />
+            <Select
+              label="Payment Method"
+              value={formData.paymentMethod}
+              onChange={handleFieldChange('paymentMethod')}
+              options={paymentMethodOptions}
+              placeholder="Select..."
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Notes */}
+      <Textarea
+        label="Notes"
+        value={formData.notes}
+        onChange={handleFieldChange('notes')}
+        placeholder="Additional notes..."
+        rows={2}
+      />
+    </div>
+  );
+}

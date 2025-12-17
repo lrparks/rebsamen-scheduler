@@ -1,0 +1,205 @@
+@import 'tailwindcss';
+
+/* Custom properties */
+:root {
+  --color-primary: #166534;
+  --color-primary-light: #22c55e;
+  --color-danger: #DC2626;
+  --color-warning: #F59E0B;
+}
+
+/* Base styles */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #f3f4f6;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Grid scroll behavior */
+.grid-container {
+  scroll-behavior: smooth;
+}
+
+/* Sticky columns and headers */
+.sticky-column {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  background: inherit;
+}
+
+.sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: inherit;
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+  }
+
+  .print-full-width {
+    width: 100% !important;
+    max-width: none !important;
+  }
+}
+
+/* Animation utilities */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Focus visible styles */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Button active state */
+button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Custom checkbox styling */
+input[type="checkbox"] {
+  accent-color: var(--color-primary);
+}
+
+/* Date input styling */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+/* Table row hover */
+tbody tr:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Modal backdrop blur */
+.modal-backdrop {
+  backdrop-filter: blur(2px);
+}
+
+/* Toast animations */
+.toast-enter {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+.toast-enter-active {
+  transform: translateX(0);
+  opacity: 1;
+  transition: all 0.3s ease-out;
+}
+
+.toast-exit {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.toast-exit-active {
+  transform: translateX(100%);
+  opacity: 0;
+  transition: all 0.3s ease-in;
+}
+
+/* Loading spinner */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+/* Custom select arrow */
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M2.5 4L6 7.5 9.5 4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2.5rem;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 640px) {
+  .mobile-full-width {
+    width: 100vw;
+    margin-left: -1rem;
+    margin-right: -1rem;
+    border-radius: 0;
+  }
+}
