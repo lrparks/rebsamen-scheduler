@@ -97,16 +97,12 @@ export function BookingsProvider({ children }) {
     const courtBookings = getBookingsForDateAndCourt(date, court)
       .filter(b => b.status === 'active' && b.booking_id !== excludeId);
 
-    const [startHour, startMin] = timeStart.split(':').map(Number);
-    const [endHour, endMin] = timeEnd.split(':').map(Number);
-    const newStart = startHour * 60 + startMin;
-    const newEnd = endHour * 60 + endMin;
+    const newStart = parseTimeToMinutes(timeStart);
+    const newEnd = parseTimeToMinutes(timeEnd);
 
     for (const booking of courtBookings) {
-      const [bStartHour, bStartMin] = booking.time_start.split(':').map(Number);
-      const [bEndHour, bEndMin] = booking.time_end.split(':').map(Number);
-      const bStart = bStartHour * 60 + bStartMin;
-      const bEnd = bEndHour * 60 + bEndMin;
+      const bStart = parseTimeToMinutes(booking.time_start);
+      const bEnd = parseTimeToMinutes(booking.time_end);
 
       // Check for overlap
       if (newStart < bEnd && newEnd > bStart) {
@@ -130,17 +126,13 @@ export function BookingsProvider({ children }) {
     const courtBookings = getBookingsForDateAndCourt(date, court)
       .filter(b => b.status === 'active' && b.booking_id !== excludeId);
 
-    const [startHour, startMin] = timeStart.split(':').map(Number);
-    const [endHour, endMin] = timeEnd.split(':').map(Number);
-    const newStart = startHour * 60 + startMin;
-    const newEnd = endHour * 60 + endMin;
+    const newStart = parseTimeToMinutes(timeStart);
+    const newEnd = parseTimeToMinutes(timeEnd);
 
     const conflicts = [];
     for (const booking of courtBookings) {
-      const [bStartHour, bStartMin] = booking.time_start.split(':').map(Number);
-      const [bEndHour, bEndMin] = booking.time_end.split(':').map(Number);
-      const bStart = bStartHour * 60 + bStartMin;
-      const bEnd = bEndHour * 60 + bEndMin;
+      const bStart = parseTimeToMinutes(booking.time_start);
+      const bEnd = parseTimeToMinutes(booking.time_end);
 
       // Check for overlap
       if (newStart < bEnd && newEnd > bStart) {
@@ -267,11 +259,26 @@ export function useBookingsContext() {
 
 /**
  * Parse time string to minutes since midnight
- * @param {string} time - HH:MM format
+ * @param {string|number} time - HH:MM format or decimal (0.375 = 9:00)
  * @returns {number}
  */
 function parseTimeToMinutes(time) {
   if (!time) return 0;
-  const [hours, minutes] = time.split(':').map(Number);
-  return hours * 60 + (minutes || 0);
+
+  // Convert to string if not already
+  const timeStr = String(time).trim();
+
+  // If it's already HH:MM format
+  if (timeStr.includes(':')) {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    return hours * 60 + (minutes || 0);
+  }
+
+  // Handle decimal format (Google Sheets stores times as fractions of a day)
+  const decimal = parseFloat(timeStr);
+  if (!isNaN(decimal) && decimal >= 0 && decimal < 1) {
+    return Math.round(decimal * 24 * 60);
+  }
+
+  return 0;
 }

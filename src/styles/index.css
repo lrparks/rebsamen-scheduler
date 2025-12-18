@@ -92,61 +92,77 @@ select {
   header,
   nav,
   .modal-backdrop,
-  button:not(.print-show) {
+  button:not(.print-show),
+  .bg-gray-100:not(.print-grid),
+  .sticky {
     display: none !important;
   }
 
   /* Reset page styling */
-  body {
+  html, body {
     background: white !important;
-    margin: 0;
-    padding: 0;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Page setup - landscape 8.5x11 with minimal margins */
+  @page {
+    size: 11in 8.5in landscape;
+    margin: 0.25in;
+  }
+
+  /* Force background colors to print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
   }
 
   /* Print-specific layout */
   .print-container {
-    width: 100%;
+    width: 100% !important;
     max-width: none !important;
     padding: 0 !important;
     margin: 0 !important;
+    page-break-inside: avoid !important;
   }
 
-  /* Print header - repeat on each page */
+  /* Print header - inline with content (not running header) */
   .print-header {
     display: block !important;
     text-align: center;
-    padding: 0.25rem 0;
-    border-bottom: 2px solid #000;
-    margin-bottom: 0.25rem;
-    position: running(header);
-  }
-
-  @page {
-    size: landscape;
-    margin: 0.5in 0.25in;
-    @top-center {
-      content: element(header);
-    }
+    padding: 0.125rem 0;
+    border-bottom: 1px solid #000;
+    margin-bottom: 0.125rem;
+    page-break-after: avoid !important;
   }
 
   .print-header h1 {
-    font-size: 1rem;
+    font-size: 0.875rem;
     margin: 0;
     font-weight: bold;
   }
 
   .print-header p {
-    font-size: 0.75rem;
-    margin: 0.125rem 0 0;
-    color: #666;
+    font-size: 0.625rem;
+    margin: 0;
+    color: #333;
   }
 
-  /* Grid adjustments for print - critical for showing bookings */
+  /* Grid adjustments for print - critical for showing all 17 courts */
   .print-grid {
     border: 1px solid #000 !important;
     overflow: visible !important;
     height: auto !important;
     max-height: none !important;
+    width: 100% !important;
+    page-break-inside: avoid !important;
+    transform-origin: top left;
+    /* Scale to fit 17 courts - adjust as needed */
+    transform: scale(0.85);
   }
 
   .print-grid > div {
@@ -155,62 +171,75 @@ select {
     max-height: none !important;
   }
 
-  /* Fix absolute positioned booking cells */
-  .print-grid [class*="absolute"] {
+  /* Keep booking cells absolutely positioned but visible */
+  .print-grid .relative {
+    overflow: visible !important;
     position: relative !important;
   }
 
-  /* Make cells visible */
-  .print-grid .relative {
+  /* Booking cell styling for print - keep absolute positioning */
+  .print-grid button[class*="absolute"] {
+    position: absolute !important;
     overflow: visible !important;
+    border: 1px solid #333 !important;
+    font-size: 0.5rem !important;
+    padding: 1px !important;
+    line-height: 1.1 !important;
+    border-radius: 2px !important;
   }
 
-  /* Booking cell styling for print */
-  .print-grid .rounded-sm,
-  .print-grid .rounded {
-    border: 1px solid #666 !important;
-    font-size: 0.6rem !important;
-    padding: 1px 2px !important;
-    overflow: hidden !important;
-    height: auto !important;
-    min-height: 100% !important;
+  /* Ensure booking content is visible */
+  .print-grid button[class*="absolute"] > div {
+    padding: 1px !important;
+    font-size: 0.5rem !important;
   }
 
-  /* Booking colors for print (simplified) */
+  .print-grid button[class*="absolute"] .text-xs {
+    font-size: 0.5rem !important;
+    line-height: 1.1 !important;
+  }
+
+  .print-grid button[class*="absolute"] .text-\\[10px\\] {
+    font-size: 0.4rem !important;
+    line-height: 1 !important;
+  }
+
+  /* Booking colors for print (lighter for readability) */
   .print-grid [class*="bg-blue"] {
     background-color: #dbeafe !important;
+    color: #1e40af !important;
   }
 
   .print-grid [class*="bg-green"] {
-    background-color: #d1fae5 !important;
+    background-color: #dcfce7 !important;
+    color: #166534 !important;
   }
 
   .print-grid [class*="bg-amber"],
   .print-grid [class*="bg-yellow"] {
     background-color: #fef3c7 !important;
+    color: #92400e !important;
   }
 
   .print-grid [class*="bg-purple"] {
-    background-color: #ede9fe !important;
+    background-color: #f3e8ff !important;
+    color: #6b21a8 !important;
   }
 
   .print-grid [class*="bg-red"],
   .print-grid [class*="bg-rose"] {
     background-color: #fee2e2 !important;
+    color: #991b1b !important;
   }
 
   .print-grid [class*="bg-orange"] {
     background-color: #ffedd5 !important;
+    color: #9a3412 !important;
   }
 
   .print-grid [class*="bg-gray"] {
-    background-color: #f3f4f6 !important;
-  }
-
-  /* Force background colors to print */
-  * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    background-color: #e5e7eb !important;
+    color: #374151 !important;
   }
 
   /* Hide scrollbars */
@@ -218,30 +247,69 @@ select {
     display: none !important;
   }
 
-  /* Ensure grid cells have proper height */
+  /* Compact grid cells for fitting all courts */
   .print-grid .h-16 {
-    height: 3rem !important;
-    min-height: 3rem !important;
+    height: 2.25rem !important;
+    min-height: 2.25rem !important;
   }
 
   .print-grid .h-12 {
-    height: 2.5rem !important;
+    height: 1.75rem !important;
   }
 
-  /* Column widths for print */
+  /* Compact column widths for 17 courts */
   .print-grid .min-w-20 {
-    min-width: 4rem !important;
-    width: 4rem !important;
+    min-width: 3.25rem !important;
+    width: 3.25rem !important;
+    flex: 0 0 3.25rem !important;
   }
 
   .print-grid .min-w-24 {
-    min-width: 5rem !important;
-    width: 5rem !important;
+    min-width: 4rem !important;
+    width: 4rem !important;
+    flex: 0 0 4rem !important;
   }
 
-  /* Time column */
+  /* Time column - narrow */
   .print-grid .w-16 {
-    width: 3rem !important;
-    min-width: 3rem !important;
+    width: 2rem !important;
+    min-width: 2rem !important;
+    flex: 0 0 2rem !important;
+  }
+
+  .print-grid .w-16 .text-xs {
+    font-size: 0.5rem !important;
+  }
+
+  /* Court headers - compact */
+  .print-grid .flex-1 {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+  }
+
+  .print-grid .text-sm {
+    font-size: 0.5rem !important;
+  }
+
+  /* Remove hover/transition effects for print */
+  .print-grid button {
+    transition: none !important;
+    box-shadow: none !important;
+  }
+
+  .print-grid button:hover {
+    box-shadow: none !important;
+  }
+
+  /* Closed cell styling */
+  .print-grid .bg-gray-200 {
+    background-color: #d1d5db !important;
+  }
+
+  /* Prevent page breaks inside grid */
+  .print-grid,
+  .print-grid > * {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }
