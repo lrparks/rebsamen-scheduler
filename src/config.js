@@ -21,7 +21,7 @@ export const CONFIG = {
 
   // Time configuration
   DAY_START_HOUR: 8,
-  DAY_START_MINUTE: 30,
+  DAY_START_MINUTE: 0,
   DAY_END_HOUR: 21,
   DAY_END_MINUTE: 0,
   SLOT_MINUTES: 30,

@@ -281,16 +281,39 @@ select {
      Reports Print Styles
      ================================ */
 
+  /* Hide report controls header in print - first child with controls */
+  .p-4.space-y-4 > .bg-white.rounded-lg.border.border-gray-200.p-4:first-child {
+    display: none !important;
+  }
+
   /* Report cards for print */
   .space-y-4 > .bg-white.rounded-lg.border {
     border: 1px solid #ccc !important;
-    margin-bottom: 12px !important;
+    margin-bottom: 8px !important;
     page-break-inside: avoid;
     box-shadow: none !important;
   }
 
+  /* More compact card padding */
+  .space-y-4 > .bg-white.rounded-lg.border .p-4 {
+    padding: 8px !important;
+  }
+
+  .space-y-4 > .bg-white.rounded-lg.border .px-4.py-3 {
+    padding: 6px 8px !important;
+  }
+
   .bg-gray-50 {
     background-color: #f5f5f5 !important;
+  }
+
+  /* Reports container - reduce spacing */
+  .p-4.space-y-4 {
+    padding: 8px !important;
+  }
+
+  .p-4.space-y-4 > .space-y-4 {
+    gap: 8px !important;
   }
 
   /* Utilization bars for print */
@@ -306,14 +329,14 @@ select {
     background-color: #eab308 !important;
   }
 
-  /* Report tables */
+  /* Report tables - more compact */
   .space-y-4 table {
-    font-size: 10pt !important;
+    font-size: 9pt !important;
   }
 
   .space-y-4 th,
   .space-y-4 td {
-    padding: 4px 8px !important;
+    padding: 3px 6px !important;
   }
 
   /* Status colors */
@@ -321,25 +344,84 @@ select {
   .text-amber-600, .text-amber-700 { color: #d97706 !important; }
   .text-red-600 { color: #dc2626 !important; }
 
-  /* Follow-up items */
+  /* Follow-up items - more compact */
   .bg-amber-50 {
     background-color: #fffbeb !important;
     border: 1px solid #fcd34d !important;
   }
 
+  /* Follow-up cards grid - more columns in print */
+  .grid.grid-cols-2 {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 6px !important;
+  }
+
+  .grid.grid-cols-2 .p-3 {
+    padding: 4px !important;
+  }
+
   /* Revenue card large text */
   .text-2xl {
-    font-size: 16pt !important;
+    font-size: 14pt !important;
   }
 
   /* Grid layouts for print - two column layout */
   .grid.gap-4 {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 12px !important;
+    gap: 8px !important;
   }
 
   .grid.gap-4 > * {
     min-width: 0 !important;
+  }
+
+  /* Available slots collapsible - expand in print */
+  .space-y-4 button[class*="w-full"][class*="px-4"][class*="py-3"] + div {
+    display: block !important;
+  }
+
+  /* Smaller text in cards */
+  .text-sm {
+    font-size: 9pt !important;
+  }
+
+  .text-xs {
+    font-size: 8pt !important;
+  }
+
+  /* Card headers */
+  .font-medium.text-gray-900 {
+    font-size: 10pt !important;
+  }
+
+  /* Maintenance grid - more compact */
+  .overflow-x-auto table {
+    font-size: 8pt !important;
+  }
+
+  .overflow-x-auto th,
+  .overflow-x-auto td {
+    padding: 2px 4px !important;
+  }
+
+  /* Space between sections */
+  .space-y-3 {
+    gap: 4px !important;
+  }
+
+  .space-y-4 {
+    gap: 6px !important;
+  }
+
+  /* Availability grid - more compact */
+  .w-5.h-5 {
+    width: 12px !important;
+    height: 12px !important;
+  }
+
+  .w-4.h-4 {
+    width: 10px !important;
+    height: 10px !important;
   }
 }

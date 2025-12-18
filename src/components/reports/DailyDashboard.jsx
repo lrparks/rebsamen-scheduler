@@ -1,23 +1,33 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useBookingsContext } from '../../context/BookingsContext.jsx';
 import { useContractors } from '../../hooks/useContractors.js';
 import { formatDateDisplay, formatDateISO } from '../../utils/dateHelpers.js';
 import {
-  getDailyUtilization,
+  getDailyUtilizationWithClosures,
   getDailyRevenue,
   getDailyActivity,
   getContractorHoursForDate,
-  getAvailableSlots,
+  getAvailabilityGrid,
   formatCurrency,
   formatTimeForReport,
   TIME_PERIODS,
-  getBookingDurationHours,
+  TOTAL_COURTS,
 } from '../../utils/reportUtils.js';
 import { fetchMaintenanceLog, fetchMaintenanceTasks } from '../../utils/api.js';
-import { useEffect } from 'react';
+import { CONFIG } from '../../config.js';
 
 /**
  * Daily Dashboard Report - Real-time operational metrics
+ * Layout:
+ * ┌────────────────────────────┬─────────────────────────┐
+ * │ Utilization by Time Period │ Today's Activity        │
+ * ├────────────────────────────┴─────────────────────────┤
+ * │ View Available Slots (collapsible)                   │
+ * ├────────────────────────────┬─────────────────────────┤
+ * │ Revenue                    │ Contractors Today       │
+ * ├────────────────────────────┴─────────────────────────┤
+ * │ Daily Maintenance                                    │
+ * └──────────────────────────────────────────────────────┘
  */
 export default function DailyDashboard({ selectedDate }) {
   const { bookings, closures, loading } = useBookingsContext();
@@ -47,10 +57,10 @@ export default function DailyDashboard({ selectedDate }) {
     loadMaintenance();
   }, []);
 
-  // Calculate all metrics
+  // Calculate all metrics using closures-aware function
   const utilization = useMemo(() =>
-    getDailyUtilization(bookings, selectedDate),
-    [bookings, selectedDate]
+    getDailyUtilizationWithClosures(bookings, closures, selectedDate),
+    [bookings, closures, selectedDate]
   );
 
   const revenue = useMemo(() =>
@@ -68,8 +78,8 @@ export default function DailyDashboard({ selectedDate }) {
     [bookings, contractors, selectedDate]
   );
 
-  const availableSlots = useMemo(() =>
-    getAvailableSlots(bookings, closures, selectedDate),
+  const availabilityGrid = useMemo(() =>
+    getAvailabilityGrid(bookings, closures, selectedDate),
     [bookings, closures, selectedDate]
   );
 
@@ -89,23 +99,22 @@ export default function DailyDashboard({ selectedDate }) {
         <p>{formatDateDisplay(selectedDate)}</p>
       </div>
 
-      {/* Utilization Section */}
-      <UtilizationCard utilization={utilization} availableSlots={availableSlots} />
-
-      {/* Revenue & Activity Row */}
+      {/* Row 1: Utilization & Activity */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <RevenueCard revenue={revenue} />
+        <UtilizationCard utilization={utilization} />
         <ActivityCard activity={activity} />
       </div>
 
-      {/* Contractors Today */}
-      <ContractorsCard
-        contractorData={contractorData}
-        bookings={bookings}
-        selectedDate={selectedDate}
-      />
+      {/* Available Slots Collapsible Bar */}
+      <AvailableSlotsBar availabilityGrid={availabilityGrid} utilization={utilization} />
 
-      {/* Maintenance Summary */}
+      {/* Row 2: Revenue & Contractors */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <RevenueCard revenue={revenue} />
+        <ContractorsCard contractorData={contractorData} />
+      </div>
+
+      {/* Maintenance Summary - Full Width */}
       <MaintenanceCard
         selectedDate={selectedDate}
         maintenanceLog={maintenanceLog}
@@ -117,11 +126,9 @@ export default function DailyDashboard({ selectedDate }) {
 }
 
 /**
- * Utilization Card with expandable available slots
+ * Utilization Card
  */
-function UtilizationCard({ utilization, availableSlots }) {
-  const [showAvailable, setShowAvailable] = useState(false);
-
+function UtilizationCard({ utilization }) {
   return (
     <div className="bg-white rounded-lg border border-gray-200">
       <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
@@ -133,9 +140,8 @@ function UtilizationCard({ utilization, availableSlots }) {
             <tr className="text-left text-xs font-medium text-gray-500 uppercase">
               <th className="pb-2">Period</th>
               <th className="pb-2 text-right">Booked</th>
-              <th className="pb-2 text-right">Available</th>
-              <th className="pb-2 text-right">Utilization</th>
-              <th className="pb-2 w-32"></th>
+              <th className="pb-2 text-right">Util</th>
+              <th className="pb-2 w-24"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -144,16 +150,18 @@ function UtilizationCard({ utilization, availableSlots }) {
                 <td className="py-2 text-sm text-gray-900">{utilization[period].label}</td>
                 <td className="py-2 text-sm text-gray-600 text-right">
                   {utilization[period].booked}/{utilization[period].total}
-                </td>
-                <td className="py-2 text-sm text-gray-600 text-right">
-                  {utilization[period].available} slots
+                  {utilization[period].closed > 0 && (
+                    <span className="text-xs text-gray-400 ml-1">
+                      ({utilization[period].closed} closed)
+                    </span>
+                  )}
                 </td>
                 <td className="py-2 text-sm font-medium text-right">
                   <span className={utilization[period].utilization >= 80 ? 'text-green-600' : ''}>
                     {utilization[period].utilization}%
                   </span>
                 </td>
-                <td className="py-2">
+                <td className="py-2 pl-2">
                   <UtilizationBar percentage={utilization[period].utilization} />
                 </td>
               </tr>
@@ -162,42 +170,21 @@ function UtilizationCard({ utilization, availableSlots }) {
               <td className="py-2 text-sm text-gray-900">TOTAL</td>
               <td className="py-2 text-sm text-gray-900 text-right">
                 {utilization.TOTAL.booked}/{utilization.TOTAL.total}
-              </td>
-              <td className="py-2 text-sm text-gray-900 text-right">
-                {utilization.TOTAL.available} slots
+                {utilization.TOTAL.closed > 0 && (
+                  <span className="text-xs text-gray-400 ml-1">
+                    ({utilization.TOTAL.closed} closed)
+                  </span>
+                )}
               </td>
               <td className="py-2 text-sm font-medium text-right">
                 {utilization.TOTAL.utilization}%
               </td>
-              <td className="py-2">
+              <td className="py-2 pl-2">
                 <UtilizationBar percentage={utilization.TOTAL.utilization} />
               </td>
             </tr>
           </tbody>
         </table>
-
-        {/* Available Slots Toggle */}
-        <button
-          onClick={() => setShowAvailable(!showAvailable)}
-          className="mt-4 flex items-center gap-2 text-sm text-green-700 hover:text-green-800"
-        >
-          <svg
-            className={`w-4 h-4 transition-transform ${showAvailable ? 'rotate-180' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-          {showAvailable ? 'Hide' : 'View'} Available Slots ({utilization.TOTAL.available})
-        </button>
-
-        {/* Available Slots Panel */}
-        {showAvailable && (
-          <div className="mt-4 border-t border-gray-200 pt-4">
-            <AvailableSlotsPanel availableSlots={availableSlots} />
-          </div>
-        )}
       </div>
     </div>
   );
@@ -217,86 +204,6 @@ function UtilizationBar({ percentage }) {
         }`}
         style={{ width: `${percentage}%` }}
       />
-    </div>
-  );
-}
-
-/**
- * Available Slots Panel showing open courts by time
- */
-function AvailableSlotsPanel({ availableSlots }) {
-  const periods = [
-    { key: 'MORNING', label: TIME_PERIODS.MORNING.label },
-    { key: 'AFTERNOON', label: TIME_PERIODS.AFTERNOON.label },
-    { key: 'PRIME', label: TIME_PERIODS.PRIME.label },
-  ];
-
-  return (
-    <div className="space-y-4">
-      {periods.map(({ key, label }) => {
-        const slots = availableSlots[key];
-        const times = Object.keys(slots).sort();
-        const totalSlots = times.reduce((sum, time) => sum + slots[time].length, 0);
-
-        if (times.length === 0) {
-          return (
-            <div key={key}>
-              <h4 className="text-sm font-medium text-gray-700 mb-2">
-                {label} - <span className="text-red-600">Fully Booked</span>
-              </h4>
-            </div>
-          );
-        }
-
-        return (
-          <div key={key}>
-            <h4 className="text-sm font-medium text-gray-700 mb-2">
-              {label} - {totalSlots} slots open
-              {totalSlots < 10 && <span className="ml-2 text-amber-600">⚠️ Limited</span>}
-            </h4>
-            <div className="space-y-1 pl-4">
-              {times.map(time => (
-                <div key={time} className="text-sm">
-                  <span className="text-gray-600 w-16 inline-block">{formatTimeForReport(time)}:</span>
-                  <span className="text-gray-900">
-                    {slots[time].length > 5
-                      ? `Courts ${slots[time].slice(0, 5).join(', ')} +${slots[time].length - 5} more`
-                      : `Court${slots[time].length > 1 ? 's' : ''} ${slots[time].join(', ')}`
-                    }
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/**
- * Revenue Summary Card
- */
-function RevenueCard({ revenue }) {
-  return (
-    <div className="bg-white rounded-lg border border-gray-200">
-      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-        <h3 className="font-medium text-gray-900">Revenue</h3>
-      </div>
-      <div className="p-4 space-y-3">
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-600">Expected</span>
-          <span className="text-sm font-medium text-gray-900">{formatCurrency(revenue.expected)}</span>
-        </div>
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-600">Collected</span>
-          <span className="text-sm font-medium text-green-600">{formatCurrency(revenue.collected)}</span>
-        </div>
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-600">Pending</span>
-          <span className="text-sm font-medium text-amber-600">{formatCurrency(revenue.pending)}</span>
-        </div>
-      </div>
     </div>
   );
 }
@@ -343,9 +250,179 @@ function ActivityCard({ activity }) {
 }
 
 /**
+ * Collapsible Available Slots Bar with color-coded grid
+ */
+function AvailableSlotsBar({ availabilityGrid, utilization }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const totalAvailable = utilization.TOTAL.available;
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200">
+      {/* Clickable Header Bar */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors rounded-lg"
+      >
+        <div className="flex items-center gap-3">
+          <svg
+            className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+          <h3 className="font-medium text-gray-900">View Available Slots</h3>
+        </div>
+        <span className={`text-sm font-medium ${totalAvailable < 20 ? 'text-amber-600' : 'text-green-600'}`}>
+          {totalAvailable} slots open
+          {utilization.TOTAL.closed > 0 && (
+            <span className="text-gray-400 ml-2">({utilization.TOTAL.closed} closed)</span>
+          )}
+        </span>
+      </button>
+
+      {/* Expanded Grid */}
+      {isExpanded && (
+        <div className="p-4 border-t border-gray-200">
+          <AvailabilityGridDisplay grid={availabilityGrid} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Color-coded availability grid display
+ */
+function AvailabilityGridDisplay({ grid }) {
+  const periods = [
+    { key: 'MORNING', label: TIME_PERIODS.MORNING.label },
+    { key: 'AFTERNOON', label: TIME_PERIODS.AFTERNOON.label },
+    { key: 'PRIME', label: TIME_PERIODS.PRIME.label },
+  ];
+
+  // Group slots by period
+  const slotsByPeriod = {
+    MORNING: grid.slots.filter(s => s.period === 'MORNING'),
+    AFTERNOON: grid.slots.filter(s => s.period === 'AFTERNOON'),
+    PRIME: grid.slots.filter(s => s.period === 'PRIME'),
+  };
+
+  // Court headers
+  const courtHeaders = [];
+  for (let i = 1; i <= TOTAL_COURTS; i++) {
+    courtHeaders.push(i === CONFIG.STADIUM_COURT_NUMBER ? 'Stad' : String(i));
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-gray-300">
+            <th className="text-left py-2 pr-2 font-medium text-gray-700 w-32"></th>
+            {courtHeaders.map((court, idx) => (
+              <th key={idx} className="text-center py-2 px-1 font-medium text-gray-600 min-w-[28px]">
+                {court}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {periods.map(({ key, label }) => {
+            const periodSlots = slotsByPeriod[key];
+            const openCount = periodSlots.reduce((sum, slot) =>
+              sum + slot.courts.filter(c => c.available && !c.closed).length, 0
+            );
+
+            return (
+              <React.Fragment key={key}>
+                {/* Period header row */}
+                <tr className="bg-gray-50">
+                  <td colSpan={TOTAL_COURTS + 1} className="py-2 px-2 font-medium text-gray-700">
+                    {label} - <span className="text-green-600">{openCount} slots open</span>
+                  </td>
+                </tr>
+                {/* Time slots for this period */}
+                {periodSlots.map(slot => (
+                  <tr key={slot.time} className="border-b border-gray-100">
+                    <td className="py-1 pr-2 text-gray-600">{slot.label}</td>
+                    {slot.courts.map((court, idx) => (
+                      <td key={idx} className="text-center py-1 px-1">
+                        <div
+                          className={`w-5 h-5 mx-auto rounded ${
+                            court.closed
+                              ? 'bg-gray-300'
+                              : court.available
+                                ? 'bg-green-400'
+                                : 'bg-red-400'
+                          }`}
+                          title={
+                            court.closed
+                              ? `Court ${court.court} - Closed`
+                              : court.available
+                                ? `Court ${court.court} - Available`
+                                : `Court ${court.court} - Booked`
+                          }
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </React.Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+
+      {/* Legend */}
+      <div className="mt-3 flex gap-4 text-xs text-gray-600">
+        <span className="flex items-center gap-1">
+          <div className="w-4 h-4 rounded bg-green-400" /> Open
+        </span>
+        <span className="flex items-center gap-1">
+          <div className="w-4 h-4 rounded bg-red-400" /> Booked
+        </span>
+        <span className="flex items-center gap-1">
+          <div className="w-4 h-4 rounded bg-gray-300" /> Closed
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Revenue Summary Card
+ */
+function RevenueCard({ revenue }) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200">
+      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+        <h3 className="font-medium text-gray-900">Revenue</h3>
+      </div>
+      <div className="p-4 space-y-3">
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-600">Expected</span>
+          <span className="text-sm font-medium text-gray-900">{formatCurrency(revenue.expected)}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-600">Collected</span>
+          <span className="text-sm font-medium text-green-600">{formatCurrency(revenue.collected)}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-600">Pending</span>
+          <span className="text-sm font-medium text-amber-600">{formatCurrency(revenue.pending)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Contractors Today Card
  */
-function ContractorsCard({ contractorData, bookings, selectedDate }) {
+function ContractorsCard({ contractorData }) {
   if (contractorData.length === 0) {
     return (
       <div className="bg-white rounded-lg border border-gray-200">
@@ -366,7 +443,6 @@ function ContractorsCard({ contractorData, bookings, selectedDate }) {
       </div>
       <div className="divide-y divide-gray-100">
         {contractorData.map(contractor => {
-          // Get court and time info
           const courts = [...new Set(contractor.bookings.map(b => b.court))].sort((a, b) => a - b);
           const times = contractor.bookings.map(b => ({
             start: b.time_start,
@@ -400,7 +476,7 @@ function ContractorsCard({ contractorData, bookings, selectedDate }) {
 }
 
 /**
- * Maintenance Summary Card with weekly grid and follow-ups
+ * Maintenance Summary Card with weekly grid and follow-ups as cards
  */
 function MaintenanceCard({ selectedDate, maintenanceLog, maintenanceTasks, loading }) {
   const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -424,10 +500,8 @@ function MaintenanceCard({ selectedDate, maintenanceLog, maintenanceTasks, loadi
   const weekDates = getWeekDates();
   const today = formatDateISO(new Date());
 
-  // Get daily tasks only for the grid
   const dailyTasks = maintenanceTasks.filter(t => t.frequency === 'daily');
 
-  // Check if a task was completed on a date
   const getTaskStatus = (taskId, date) => {
     const entry = maintenanceLog.find(e =>
       e.task_id === taskId &&
@@ -436,18 +510,14 @@ function MaintenanceCard({ selectedDate, maintenanceLog, maintenanceTasks, loadi
     );
 
     if (!entry) {
-      // If date is in the future, it's pending
       if (date > today) return 'pending';
-      // If date is today or past and not done, it's not done
       return 'not_done';
     }
 
-    // Check if there's a follow-up needed
     if (entry.follow_up_needed === 'TRUE') return 'issue';
     return 'complete';
   };
 
-  // Get all follow-up items
   const followUps = maintenanceLog.filter(e =>
     e.follow_up_needed === 'TRUE'
   ).sort((a, b) => {
@@ -480,7 +550,7 @@ function MaintenanceCard({ selectedDate, maintenanceLog, maintenanceTasks, loadi
               <tr className="border-b border-gray-200">
                 <th className="text-left py-2 pr-4 font-medium text-gray-700">Task</th>
                 {weekDates.map((date, i) => {
-                  const dayName = DAYS[(i + 1) % 7]; // Mon = 0 in our array
+                  const dayName = DAYS[(i + 1) % 7];
                   const isToday = date === today;
                   return (
                     <th
@@ -525,21 +595,21 @@ function MaintenanceCard({ selectedDate, maintenanceLog, maintenanceTasks, loadi
           <span><StatusIcon status="pending" /> Pending</span>
         </div>
 
-        {/* Follow-ups */}
+        {/* Follow-ups as Cards */}
         {followUps.length > 0 && (
           <div className="mt-4 border-t border-gray-200 pt-4">
-            <h4 className="text-sm font-medium text-amber-700 mb-2">
+            <h4 className="text-sm font-medium text-amber-700 mb-3">
               ⚠️ Open Follow-ups ({followUps.length})
             </h4>
-            <div className="space-y-2">
-              {followUps.slice(0, 5).map((entry, idx) => (
-                <div key={idx} className="text-sm bg-amber-50 rounded p-2">
-                  <div className="font-medium text-amber-900">
-                    {entry.court && entry.court !== 'all' ? `Court ${entry.court}: ` : ''}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+              {followUps.slice(0, 6).map((entry, idx) => (
+                <div key={idx} className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <div className="text-sm font-medium text-amber-900 line-clamp-2">
+                    {entry.court && entry.court !== 'all' ? `Ct ${entry.court}: ` : ''}
                     {entry.follow_up_note || entry.task_name}
                   </div>
-                  <div className="text-xs text-amber-700">
-                    Found: {entry.date || entry.completed_date} by {entry.completed_by}
+                  <div className="text-xs text-amber-700 mt-1">
+                    {entry.date || entry.completed_date} • {entry.completed_by}
                   </div>
                 </div>
               ))}

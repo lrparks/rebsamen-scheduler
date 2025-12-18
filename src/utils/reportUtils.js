@@ -4,14 +4,14 @@ import { formatDateISO } from './dateHelpers.js';
 
 /**
  * Time periods for utilization reporting
- * Using 1-hour slots: 13 slots per day (8:30-9:30, 9:30-10:30, ... 8:00-9:00)
+ * Using 1-hour slots: 13 slots per day (8am-9pm)
  */
 export const TIME_PERIODS = {
   MORNING: {
-    start: '08:30',
+    start: '08:00',
     end: '12:00',
-    label: 'Morning (8:30am-12pm)',
-    slots: 4, // 8:30, 9:30, 10:30, 11:30 (4 hour-slots, ends at 12:00)
+    label: 'Morning (8am-12pm)',
+    slots: 4, // 8:00, 9:00, 10:00, 11:00 (4 hour-slots, ends at 12:00)
   },
   AFTERNOON: {
     start: '12:00',
@@ -27,7 +27,7 @@ export const TIME_PERIODS = {
   },
 };
 
-// Total 1-hour slots per day: 13 (from 8:30 to 21:00)
+// Total 1-hour slots per day: 13 (from 8:00 to 21:00)
 export const TOTAL_SLOTS_PER_DAY = 13;
 export const TOTAL_COURTS = CONFIG.TOTAL_COURTS; // 17
 
@@ -191,24 +191,8 @@ export function getAvailableSlots(bookings, closures, date) {
     b.status !== BOOKING_STATUS.CANCELLED
   );
 
-  // Generate all 1-hour time slots
-  const hourSlots = [];
-  let hour = 8;
-  let minute = 30;
-  while (hour < 21 || (hour === 21 && minute === 0)) {
-    const time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-    if (hour < 20 || (hour === 20 && minute === 0)) {
-      hourSlots.push(time);
-    }
-    minute += 60;
-    if (minute >= 60) {
-      minute = minute - 60;
-      hour++;
-    }
-  }
-
-  // Simplified: generate slots at hour boundaries starting from 8:30
-  const slots = ['08:30', '09:30', '10:30', '11:30', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
+  // Generate all 1-hour time slots starting from 8am
+  const slots = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
 
   const result = {
     MORNING: {},
@@ -498,6 +482,50 @@ export function getContractorHoursForRange(bookings, contractors, startDate, end
 }
 
 // ============================================
+// TEAM CALCULATIONS
+// ============================================
+
+/**
+ * Get team hours for a date range
+ * @param {Array} bookings
+ * @param {Array} teams
+ * @param {string} startDate
+ * @param {string} endDate
+ * @returns {Array}
+ */
+export function getTeamHoursForRange(bookings, teams, startDate, endDate) {
+  const rangeBookings = bookings.filter(b =>
+    b.date >= startDate &&
+    b.date <= endDate &&
+    b.booking_type?.startsWith('team_') &&
+    b.status !== BOOKING_STATUS.CANCELLED
+  );
+
+  const teamMap = new Map();
+
+  rangeBookings.forEach(booking => {
+    const teamId = booking.entity_id;
+    if (!teamMap.has(teamId)) {
+      const team = teams?.find(t => t.team_id === teamId);
+      teamMap.set(teamId, {
+        id: teamId,
+        name: team?.name || booking.customer_name || 'Unknown Team',
+        type: booking.booking_type,
+        totalHours: 0,
+        revenue: 0,
+      });
+    }
+
+    const entry = teamMap.get(teamId);
+    entry.totalHours += getBookingDurationHours(booking);
+    entry.revenue += parseFloat(booking.payment_amount) || 0;
+  });
+
+  return Array.from(teamMap.values())
+    .sort((a, b) => b.totalHours - a.totalHours);
+}
+
+// ============================================
 // BOOKING TYPE BREAKDOWN
 // ============================================
 
@@ -736,4 +764,166 @@ export function formatTimeForReport(time) {
   const period = hours >= 12 ? 'pm' : 'am';
   const displayHour = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
   return minutes === 0 ? `${displayHour}${period}` : `${displayHour}:${String(minutes).padStart(2, '0')}${period}`;
+}
+
+// ============================================
+// AVAILABILITY GRID
+// ============================================
+
+/**
+ * Get availability grid for color-coded display
+ * Returns a grid of slot availability by time and court
+ * @param {Array} bookings
+ * @param {Array} closures
+ * @param {string} date
+ * @returns {object} { slots: [{time, label, courts: [{ court, available, closed }]}], closedCount }
+ */
+export function getAvailabilityGrid(bookings, closures, date) {
+  const dayBookings = bookings.filter(b =>
+    b.date === date &&
+    b.status !== BOOKING_STATUS.CANCELLED
+  );
+
+  const dayClosures = closures?.filter(c => c.date === date) || [];
+
+  // Generate all 1-hour time slots starting from 8am
+  const timeSlots = [
+    { time: '08:00', label: '8am' },
+    { time: '09:00', label: '9am' },
+    { time: '10:00', label: '10am' },
+    { time: '11:00', label: '11am' },
+    { time: '12:00', label: '12pm' },
+    { time: '13:00', label: '1pm' },
+    { time: '14:00', label: '2pm' },
+    { time: '15:00', label: '3pm' },
+    { time: '16:00', label: '4pm' },
+    { time: '17:00', label: '5pm' },
+    { time: '18:00', label: '6pm' },
+    { time: '19:00', label: '7pm' },
+    { time: '20:00', label: '8pm' },
+  ];
+
+  let closedCount = 0;
+
+  const slots = timeSlots.map(({ time, label }) => {
+    const slotStart = parseTimeToMinutes(time);
+    const slotEnd = slotStart + 60;
+
+    // Determine which period this slot belongs to
+    let period = 'MORNING';
+    if (slotStart >= parseTimeToMinutes('12:00') && slotStart < parseTimeToMinutes('17:00')) {
+      period = 'AFTERNOON';
+    } else if (slotStart >= parseTimeToMinutes('17:00')) {
+      period = 'PRIME';
+    }
+
+    const courts = [];
+    for (let court = 1; court <= TOTAL_COURTS; court++) {
+      // Check if court is closed at this time
+      const isClosed = dayClosures.some(c => {
+        if (c.court !== 'all' && parseInt(c.court, 10) !== court) return false;
+        const closureStart = parseTimeToMinutes(c.time_start);
+        const closureEnd = parseTimeToMinutes(c.time_end);
+        return slotStart < closureEnd && slotEnd > closureStart;
+      });
+
+      if (isClosed) {
+        closedCount++;
+        courts.push({ court, available: false, closed: true });
+        continue;
+      }
+
+      // Check if court is booked at this time
+      const isBooked = dayBookings.some(b => {
+        if (parseInt(b.court, 10) !== court) return false;
+        const bookingStart = parseTimeToMinutes(b.time_start);
+        const bookingEnd = parseTimeToMinutes(b.time_end);
+        return slotStart < bookingEnd && slotEnd > bookingStart;
+      });
+
+      courts.push({ court, available: !isBooked, closed: false });
+    }
+
+    return { time, label, period, courts };
+  });
+
+  return { slots, closedCount };
+}
+
+/**
+ * Get utilization stats excluding closed courts
+ * @param {Array} bookings
+ * @param {Array} closures
+ * @param {string} date
+ * @returns {object}
+ */
+export function getDailyUtilizationWithClosures(bookings, closures, date) {
+  const grid = getAvailabilityGrid(bookings, closures, date);
+  const stats = {};
+
+  // Group slots by period
+  const periodSlots = {
+    MORNING: grid.slots.filter(s => s.period === 'MORNING'),
+    AFTERNOON: grid.slots.filter(s => s.period === 'AFTERNOON'),
+    PRIME: grid.slots.filter(s => s.period === 'PRIME'),
+  };
+
+  Object.keys(TIME_PERIODS).forEach(periodKey => {
+    const slotsInPeriod = periodSlots[periodKey] || [];
+
+    let totalAvailableSlots = 0;
+    let bookedSlots = 0;
+    let closedSlots = 0;
+
+    slotsInPeriod.forEach(slot => {
+      slot.courts.forEach(court => {
+        if (court.closed) {
+          closedSlots++;
+        } else {
+          totalAvailableSlots++;
+          if (!court.available) {
+            bookedSlots++;
+          }
+        }
+      });
+    });
+
+    stats[periodKey] = {
+      label: TIME_PERIODS[periodKey].label,
+      booked: bookedSlots,
+      total: totalAvailableSlots,
+      available: totalAvailableSlots - bookedSlots,
+      closed: closedSlots,
+      utilization: calculateUtilization(bookedSlots, totalAvailableSlots),
+    };
+  });
+
+  // Total for day
+  let totalAvailable = 0;
+  let totalBooked = 0;
+  let totalClosed = 0;
+
+  grid.slots.forEach(slot => {
+    slot.courts.forEach(court => {
+      if (court.closed) {
+        totalClosed++;
+      } else {
+        totalAvailable++;
+        if (!court.available) {
+          totalBooked++;
+        }
+      }
+    });
+  });
+
+  stats.TOTAL = {
+    label: 'Total',
+    booked: totalBooked,
+    total: totalAvailable,
+    available: totalAvailable - totalBooked,
+    closed: totalClosed,
+    utilization: calculateUtilization(totalBooked, totalAvailable),
+  };
+
+  return stats;
 }
