@@ -165,7 +165,14 @@ export default function BookingForm({
           <Select
             label="Contractor"
             value={formData.entityId}
-            onChange={handleFieldChange('entityId')}
+            onChange={(value) => {
+              const contractor = contractorOptions.find(c => c.value === value);
+              onChange({
+                entityId: value,
+                customerName: contractor?.name || contractor?.label || '',
+                customerPhone: contractor?.phone || '',
+              });
+            }}
             options={contractorOptions}
             placeholder="Select contractor..."
             required
@@ -179,20 +186,56 @@ export default function BookingForm({
 
       {/* Team Selection */}
       {isTeam && (
-        teamOptions.length > 0 ? (
-          <Select
-            label="Team"
-            value={formData.entityId}
-            onChange={handleFieldChange('entityId')}
-            options={teamOptions}
-            placeholder="Select team..."
-            required
-          />
-        ) : (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
-            <strong>No teams configured.</strong> Add teams to the Teams sheet in Google Sheets, or enter team info in Customer Name/Notes fields.
-          </div>
-        )
+        (() => {
+          // For team_other, show free-fill instead of dropdown
+          if (formData.bookingType === BOOKING_TYPES.TEAM_OTHER) {
+            return (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+                Enter team name in the Customer Name field below.
+              </div>
+            );
+          }
+
+          // Filter team options based on booking type
+          const teamTypeMap = {
+            [BOOKING_TYPES.TEAM_USTA]: ['usta_adult', 'usta_junior', 'usta'],
+            [BOOKING_TYPES.TEAM_HS]: ['team_hs', 'high_school', 'hs'],
+            [BOOKING_TYPES.TEAM_COLLEGE]: ['college', 'university'],
+          };
+
+          const allowedTypes = teamTypeMap[formData.bookingType] || [];
+          const filteredOptions = teamOptions.filter(t =>
+            allowedTypes.some(allowed =>
+              (t.type || '').toLowerCase().includes(allowed.toLowerCase())
+            )
+          );
+
+          if (filteredOptions.length > 0) {
+            return (
+              <Select
+                label="Team"
+                value={formData.entityId}
+                onChange={(value) => {
+                  const team = filteredOptions.find(t => t.value === value);
+                  onChange({
+                    entityId: value,
+                    customerName: team?.label || '',
+                    customerPhone: team?.phone || '',
+                  });
+                }}
+                options={filteredOptions}
+                placeholder="Select team..."
+                required
+              />
+            );
+          }
+
+          return (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+              <strong>No teams found for this type.</strong> Add teams to the Teams sheet in Google Sheets, or enter team info in Customer Name field below.
+            </div>
+          );
+        })()
       )}
 
       {/* Tournament Selection */}
