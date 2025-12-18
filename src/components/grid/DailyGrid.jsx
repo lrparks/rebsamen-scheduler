@@ -47,7 +47,110 @@ export default function DailyGrid({
   const bookingMap = useMemo(() => {
     const map = new Map();
 
-    // First pass: collect all bookings per slot
+    // Helper to check if two bookings overlap in time
+    const bookingsOverlap = (b1, b2) => {
+      if (parseInt(b1.court, 10) !== parseInt(b2.court, 10)) return false;
+      const start1 = timeSlots.indexOf(b1.time_start);
+      const end1 = timeSlots.indexOf(b1.time_end);
+      const start2 = timeSlots.indexOf(b2.time_start);
+      const end2 = timeSlots.indexOf(b2.time_end);
+      return start1 < end2 && start2 < end1;
+    };
+
+    // Group overlapping bookings by court
+    const courtBookings = new Map();
+    bookings.forEach((booking) => {
+      if (booking.status === 'cancelled') return;
+      const court = parseInt(booking.court, 10);
+      if (!courtBookings.has(court)) {
+        courtBookings.set(court, []);
+      }
+      courtBookings.get(court).push(booking);
+    });
+
+    // For each court, find overlap groups and assign column indices
+    const bookingColumns = new Map(); // booking_id -> { columnIndex, columnCount }
+
+    courtBookings.forEach((courtBookingList, court) => {
+      // Find all bookings that overlap with each booking
+      const overlapGroups = [];
+
+      courtBookingList.forEach((booking) => {
+        // Find which groups this booking overlaps with
+        let foundGroup = null;
+        for (const group of overlapGroups) {
+          if (group.some(b => bookingsOverlap(b, booking))) {
+            foundGroup = group;
+            break;
+          }
+        }
+
+        if (foundGroup) {
+          foundGroup.push(booking);
+        } else {
+          overlapGroups.push([booking]);
+        }
+      });
+
+      // Merge groups that now overlap due to added bookings
+      let merged = true;
+      while (merged) {
+        merged = false;
+        for (let i = 0; i < overlapGroups.length; i++) {
+          for (let j = i + 1; j < overlapGroups.length; j++) {
+            const groupI = overlapGroups[i];
+            const groupJ = overlapGroups[j];
+            // Check if any booking in groupI overlaps with any in groupJ
+            const overlaps = groupI.some(b1 => groupJ.some(b2 => bookingsOverlap(b1, b2)));
+            if (overlaps) {
+              // Merge groupJ into groupI
+              overlapGroups[i] = [...groupI, ...groupJ];
+              overlapGroups.splice(j, 1);
+              merged = true;
+              break;
+            }
+          }
+          if (merged) break;
+        }
+      }
+
+      // Assign column indices within each group
+      overlapGroups.forEach((group) => {
+        // Sort by start time for consistent ordering
+        group.sort((a, b) => timeSlots.indexOf(a.time_start) - timeSlots.indexOf(b.time_start));
+
+        // Find maximum concurrent overlaps in this group
+        let maxConcurrent = 1;
+        group.forEach((booking) => {
+          const concurrent = group.filter(b => bookingsOverlap(b, booking)).length;
+          maxConcurrent = Math.max(maxConcurrent, concurrent);
+        });
+
+        // Assign columns using a greedy algorithm
+        const assignedColumns = new Map();
+        group.forEach((booking, idx) => {
+          // Find the first available column
+          const usedColumns = new Set();
+          group.forEach((other) => {
+            if (other.booking_id !== booking.booking_id && bookingsOverlap(booking, other)) {
+              const col = assignedColumns.get(other.booking_id);
+              if (col !== undefined) usedColumns.add(col);
+            }
+          });
+
+          let column = 0;
+          while (usedColumns.has(column)) column++;
+          assignedColumns.set(booking.booking_id, column);
+
+          bookingColumns.set(booking.booking_id, {
+            columnIndex: column,
+            columnCount: maxConcurrent,
+          });
+        });
+      });
+    });
+
+    // Now build the slot map with consistent column info
     bookings.forEach((booking) => {
       if (booking.status === 'cancelled') return;
 
@@ -58,6 +161,8 @@ export default function DailyGrid({
       const startIndex = timeSlots.indexOf(startTime);
       const endIndex = timeSlots.indexOf(endTime);
       const slotsSpanned = endIndex > startIndex ? endIndex - startIndex : 1;
+
+      const columnInfo = bookingColumns.get(booking.booking_id) || { columnIndex: 0, columnCount: 1 };
 
       // Add to each slot this booking occupies
       for (let i = 0; i < slotsSpanned; i++) {
@@ -71,18 +176,11 @@ export default function DailyGrid({
             booking,
             isFirstSlot: i === 0,
             slotsSpanned: i === 0 ? slotsSpanned : 0,
+            overlapCount: columnInfo.columnCount,
+            overlapIndex: columnInfo.columnIndex,
           });
         }
       }
-    });
-
-    // Second pass: calculate overlap positions for each slot
-    map.forEach((bookingsInSlot, key) => {
-      const count = bookingsInSlot.length;
-      bookingsInSlot.forEach((item, index) => {
-        item.overlapCount = count;
-        item.overlapIndex = index;
-      });
     });
 
     return map;
