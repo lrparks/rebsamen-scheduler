@@ -240,6 +240,11 @@ export default function BookingModal({
 
     // Build all proposed bookings
     const proposedBookings = [];
+    const totalBookings = dates.length * courts.length;
+    // Apportion payment across all bookings in the group
+    const paymentPerBooking = totalBookings > 1
+      ? (parseFloat(formData.paymentAmount) / totalBookings).toFixed(2)
+      : formData.paymentAmount;
     for (const date of dates) {
       for (const court of courts) {
         proposedBookings.push({
@@ -254,7 +259,7 @@ export default function BookingModal({
           customer_name: formData.customerName,
           customer_phone: formData.customerPhone,
           payment_status: formData.paymentStatus,
-          payment_amount: formData.paymentAmount,
+          payment_amount: paymentPerBooking,
           payment_method: formData.paymentMethod,
           notes: formData.notes,
           participant_count: formData.participantCount || 2,
