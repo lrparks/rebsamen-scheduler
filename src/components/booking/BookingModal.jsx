@@ -134,6 +134,8 @@ export default function BookingModal({
           paymentAmount: booking.payment_amount || '0',
           paymentMethod: booking.payment_method || '',
           notes: booking.notes || '',
+          participantCount: parseInt(booking.participant_count, 10) || 2,
+          isYouth: booking.is_youth === 'TRUE' || booking.is_youth === true,
         });
       } else if (initialData) {
         // Create new booking with pre-filled data from drag selection
@@ -165,6 +167,8 @@ export default function BookingModal({
           paymentMethod: '',
           notes: '',
           isMultiDay: selectedDates.length > 1,
+          participantCount: 2,
+          isYouth: false,
         });
       }
     }
@@ -253,6 +257,8 @@ export default function BookingModal({
           payment_amount: formData.paymentAmount,
           payment_method: formData.paymentMethod,
           notes: formData.notes,
+          participant_count: formData.participantCount || 2,
+          is_youth: formData.isYouth || false,
           status: 'active',
           created_by: initials,
           created_at: new Date().toISOString(),
@@ -467,6 +473,8 @@ export default function BookingModal({
         payment_amount: formData.paymentAmount,
         payment_method: formData.paymentMethod,
         notes: formData.notes,
+        participant_count: formData.participantCount || 2,
+        is_youth: formData.isYouth || false,
         modified_at: new Date().toISOString(),
       };
 
@@ -524,6 +532,8 @@ export default function BookingModal({
       paymentAmount: booking.payment_amount || '10.00',
       paymentMethod: '',
       notes: booking.notes ? `(Copied from ${booking.booking_id}) ${booking.notes}` : `(Copied from ${booking.booking_id})`,
+      participantCount: parseInt(booking.participant_count, 10) || 2,
+      isYouth: booking.is_youth === 'TRUE' || booking.is_youth === true,
     });
     setMode('create');
   };

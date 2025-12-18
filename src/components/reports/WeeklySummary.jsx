@@ -11,6 +11,7 @@ import {
   getBookingEfficiency,
   getContractorHoursForRange,
   getTeamHoursForRange,
+  getParticipationMetrics,
   formatCurrency,
 } from '../../utils/reportUtils.js';
 import { fetchMaintenanceLog, fetchMaintenanceTasks } from '../../utils/api.js';
@@ -82,6 +83,11 @@ export default function WeeklySummary({ weekStart }) {
     [bookings, teams, startDate, endDate]
   );
 
+  const participation = useMemo(() =>
+    getParticipationMetrics(bookings, startDate, endDate),
+    [bookings, startDate, endDate]
+  );
+
   // Get last week's contractor hours for comparison
   const lastWeekStart = new Date(weekStart);
   lastWeekStart.setDate(lastWeekStart.getDate() - 7);
@@ -96,6 +102,11 @@ export default function WeeklySummary({ weekStart }) {
   const lastWeekTeams = useMemo(() =>
     getTeamHoursForRange(bookings, teams, lastWeekStartStr, lastWeekEndStr),
     [bookings, teams, lastWeekStartStr, lastWeekEndStr]
+  );
+
+  const lastWeekParticipation = useMemo(() =>
+    getParticipationMetrics(bookings, lastWeekStartStr, lastWeekEndStr),
+    [bookings, lastWeekStartStr, lastWeekEndStr]
   );
 
   if (loading) {
@@ -120,13 +131,21 @@ export default function WeeklySummary({ weekStart }) {
         <BookingTypesCard breakdown={typeBreakdown} />
       </div>
 
-      {/* Row 2: Revenue & Efficiency */}
+      {/* Row 2: Revenue & Participation */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <RevenueCard revenue={revenue} />
+        <ParticipationCard
+          participation={participation}
+          lastWeekParticipation={lastWeekParticipation}
+        />
+      </div>
+
+      {/* Row 3: Efficiency */}
+      <div className="grid grid-cols-1 gap-4">
         <EfficiencyCard efficiency={efficiency} />
       </div>
 
-      {/* Row 3: Top Contractors & Top Teams */}
+      {/* Row 4: Top Contractors & Top Teams */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <TopContractorsCard
           contractors={topContractors}
@@ -340,40 +359,93 @@ function EfficiencyCard({ efficiency }) {
         {efficiency.total === 0 ? (
           <div className="text-sm text-gray-500">No bookings this week</div>
         ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <div className="text-2xl font-bold text-gray-900">{efficiency.total}</div>
+              <div className="text-sm text-gray-500">Total Bookings</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-green-600">{efficiency.completedRate}%</div>
+              <div className="text-sm text-gray-500">Completion Rate</div>
+            </div>
+            <div>
+              <div className={`text-2xl font-bold ${efficiency.cancelledRate > 10 ? 'text-red-600' : 'text-gray-900'}`}>
+                {efficiency.cancelled}
+              </div>
+              <div className="text-sm text-gray-500">Cancelled ({efficiency.cancelledRate}%)</div>
+            </div>
+            <div>
+              <div className={`text-2xl font-bold ${efficiency.noShowRate > 5 ? 'text-red-600' : 'text-gray-900'}`}>
+                {efficiency.noShows}
+              </div>
+              <div className="text-sm text-gray-500">No-shows ({efficiency.noShowRate}%)</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Participation Card
+ */
+function ParticipationCard({ participation, lastWeekParticipation }) {
+  const change = participation.total - lastWeekParticipation.total;
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200">
+      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+        <h3 className="font-medium text-gray-900">Participation</h3>
+      </div>
+      <div className="p-4">
+        {participation.total === 0 ? (
+          <div className="text-sm text-gray-500">No participation data this week</div>
+        ) : (
           <div className="space-y-4">
-            {/* Summary Stats */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Total Participants */}
+            <div className="flex items-end justify-between">
               <div>
-                <div className="text-2xl font-bold text-gray-900">{efficiency.total}</div>
-                <div className="text-sm text-gray-500">Total Bookings</div>
+                <div className="text-2xl font-bold text-gray-900">{participation.total}</div>
+                <div className="text-sm text-gray-500">Total Participants</div>
               </div>
-              <div>
-                <div className="text-2xl font-bold text-green-600">{efficiency.completedRate}%</div>
-                <div className="text-sm text-gray-500">Completion Rate</div>
-              </div>
+              {change !== 0 && (
+                <div className={`text-sm font-medium ${change > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {change > 0 ? '+' : ''}{change} vs last week
+                </div>
+              )}
             </div>
 
-            {/* Breakdown */}
-            <div className="space-y-2 pt-4 border-t border-gray-200">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Completed</span>
-                <span className="font-medium">{efficiency.completed} ({efficiency.completedRate}%)</span>
+            {/* Adult vs Youth breakdown */}
+            <div className="pt-3 border-t border-gray-200">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-600">Adults</span>
+                <span className="font-medium">{participation.adults}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Cancelled</span>
-                <span className={`font-medium ${efficiency.cancelledRate > 10 ? 'text-red-600' : ''}`}>
-                  {efficiency.cancelled} ({efficiency.cancelledRate}%)
-                </span>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-600">Youth (under 18)</span>
+                <span className="font-medium text-blue-600">{participation.youth}</span>
               </div>
+              {participation.total > 0 && (
+                <div className="mt-2">
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="h-2 rounded-full bg-blue-500"
+                      style={{ width: `${participation.youthPercentage}%` }}
+                    />
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {participation.youthPercentage}% youth participation
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Average per booking */}
+            <div className="pt-3 border-t border-gray-200">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">No-shows</span>
-                <span className={`font-medium ${efficiency.noShowRate > 5 ? 'text-red-600' : ''}`}>
-                  {efficiency.noShows} ({efficiency.noShowRate}%)
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Check-in Rate</span>
-                <span className="font-medium text-green-600">{efficiency.checkInRate}%</span>
+                <span className="text-gray-600">Avg per booking</span>
+                <span className="font-medium">{participation.avgPerBooking} players</span>
               </div>
             </div>
           </div>
