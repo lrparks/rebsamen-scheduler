@@ -18,7 +18,17 @@ export function generateBookingId(date, court, timeStart) {
   const day = String(d.getDate()).padStart(2, '0');
   const courtStr = String(court).padStart(2, '0');
   const normalized = normalizeTime(timeStart);
-  const [hour, minute] = normalized.split(':');
+
+  // Safely parse time - default to 08:30 if invalid
+  let hour = '08';
+  let minute = '30';
+  if (normalized && typeof normalized === 'string' && normalized.includes(':')) {
+    const parts = normalized.split(':');
+    if (parts.length >= 2) {
+      hour = (parts[0] || '08').padStart(2, '0');
+      minute = (parts[1] || '30').padStart(2, '0');
+    }
+  }
 
   return `${day}${courtStr}-${hour}${minute}`;
 }

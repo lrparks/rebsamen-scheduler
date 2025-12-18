@@ -48,15 +48,27 @@ export default function ContractorView({ onBookingClick }) {
     });
   }, [bookings, selectedContractor, startDate, endDate]);
 
+  // Safely parse time to minutes
+  const safeParseTimeMinutes = (normalized) => {
+    if (!normalized || typeof normalized !== 'string' || !normalized.includes(':')) {
+      return 0;
+    }
+    const parts = normalized.split(':');
+    if (parts.length < 2) return 0;
+    const hours = parseInt(parts[0], 10) || 0;
+    const minutes = parseInt(parts[1], 10) || 0;
+    return hours * 60 + minutes;
+  };
+
   // Calculate stats
   const stats = useMemo(() => {
     const totalHours = filteredBookings.reduce((sum, b) => {
       const startNorm = normalizeTime(b.time_start);
       const endNorm = normalizeTime(b.time_end);
       if (!startNorm || !endNorm) return sum;
-      const [startH, startM] = startNorm.split(':').map(Number);
-      const [endH, endM] = endNorm.split(':').map(Number);
-      const hours = (endH * 60 + endM - startH * 60 - startM) / 60;
+      const startMinutes = safeParseTimeMinutes(startNorm);
+      const endMinutes = safeParseTimeMinutes(endNorm);
+      const hours = (endMinutes - startMinutes) / 60;
       return sum + hours;
     }, 0);
 
