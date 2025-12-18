@@ -17,6 +17,7 @@ export default function Navigation({
     { id: 'contractors', label: 'Contractors' },
     { id: 'teams', label: 'Teams' },
     { id: 'tournaments', label: 'Tournaments' },
+    { id: 'closures', label: 'Closures' },
     { id: 'search', label: 'Search' },
     { id: 'maintenance', label: 'Maintenance' },
   ];

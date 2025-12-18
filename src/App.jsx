@@ -12,6 +12,7 @@ import TeamsView from './components/views/TeamsView.jsx';
 import TournamentsView from './components/views/TournamentsView.jsx';
 import SearchView from './components/views/SearchView.jsx';
 import MaintenanceView from './components/views/MaintenanceView.jsx';
+import ClosuresView from './components/views/ClosuresView.jsx';
 import BookingModal from './components/booking/BookingModal.jsx';
 import Modal from './components/common/Modal.jsx';
 import { formatDateISO, formatDateDisplay } from './utils/dateHelpers.js';
@@ -193,6 +194,9 @@ function AppContent() {
 
       case 'tournaments':
         return <TournamentsView onBookingClick={handleBookingClick} />;
+
+      case 'closures':
+        return <ClosuresView />;
 
       case 'search':
         return <SearchView onBookingClick={handleBookingClick} />;

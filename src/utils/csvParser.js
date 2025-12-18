@@ -21,13 +21,45 @@ export function parseCSV(csvText) {
 
     headers.forEach((header, index) => {
       const key = header.trim().toLowerCase().replace(/\s+/g, '_');
-      row[key] = values[index] ? values[index].trim() : '';
+      let value = values[index] ? values[index].trim() : '';
+
+      // Normalize date fields to YYYY-MM-DD format
+      if (key === 'date' || key.endsWith('_date')) {
+        value = normalizeDateFormat(value);
+      }
+
+      row[key] = value;
     });
 
     data.push(row);
   }
 
   return data;
+}
+
+/**
+ * Normalize date string to YYYY-MM-DD format
+ * Handles MM/DD/YYYY, M/D/YYYY, and YYYY-MM-DD formats
+ * @param {string} dateStr - Date string in various formats
+ * @returns {string} Date in YYYY-MM-DD format
+ */
+function normalizeDateFormat(dateStr) {
+  if (!dateStr) return '';
+
+  // Already in YYYY-MM-DD format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return dateStr;
+  }
+
+  // Handle MM/DD/YYYY or M/D/YYYY format
+  const slashMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) {
+    const [, month, day, year] = slashMatch;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+
+  // Return original if format not recognized
+  return dateStr;
 }
 
 /**
