@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useBookingsContext } from '../../context/BookingsContext.jsx';
 import { useContractors } from '../../hooks/useContractors.js';
+import { useTeams } from '../../hooks/useTeams.js';
 import { formatDateISO } from '../../utils/dateHelpers.js';
 import {
   getWeekEnd,
@@ -9,6 +10,7 @@ import {
   getRevenueForRange,
   getBookingEfficiency,
   getContractorHoursForRange,
+  getTeamHoursForRange,
   formatCurrency,
 } from '../../utils/reportUtils.js';
 
@@ -18,6 +20,7 @@ import {
 export default function WeeklySummary({ weekStart }) {
   const { bookings, loading } = useBookingsContext();
   const { contractors } = useContractors();
+  const { teams } = useTeams();
 
   // Calculate date range
   const startDate = formatDateISO(weekStart);
@@ -49,6 +52,11 @@ export default function WeeklySummary({ weekStart }) {
     [bookings, contractors, startDate, endDate]
   );
 
+  const topTeams = useMemo(() =>
+    getTeamHoursForRange(bookings, teams, startDate, endDate),
+    [bookings, teams, startDate, endDate]
+  );
+
   // Get last week's contractor hours for comparison
   const lastWeekStart = new Date(weekStart);
   lastWeekStart.setDate(lastWeekStart.getDate() - 7);
@@ -58,6 +66,11 @@ export default function WeeklySummary({ weekStart }) {
   const lastWeekContractors = useMemo(() =>
     getContractorHoursForRange(bookings, contractors, lastWeekStartStr, lastWeekEndStr),
     [bookings, contractors, lastWeekStartStr, lastWeekEndStr]
+  );
+
+  const lastWeekTeams = useMemo(() =>
+    getTeamHoursForRange(bookings, teams, lastWeekStartStr, lastWeekEndStr),
+    [bookings, teams, lastWeekStartStr, lastWeekEndStr]
   );
 
   if (loading) {
@@ -76,21 +89,27 @@ export default function WeeklySummary({ weekStart }) {
         <p>Week of {startDate} to {endDate}</p>
       </div>
 
-      {/* Utilization Comparison */}
-      <UtilizationComparisonCard comparison={comparison} />
-
-      {/* Booking Types & Revenue Row */}
+      {/* Row 1: Utilization Summary & Booking Types (50/50) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <UtilizationComparisonCard comparison={comparison} />
         <BookingTypesCard breakdown={typeBreakdown} />
-        <RevenueCard revenue={revenue} />
       </div>
 
-      {/* Efficiency & Top Contractors Row */}
+      {/* Row 2: Revenue & Efficiency */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <RevenueCard revenue={revenue} />
         <EfficiencyCard efficiency={efficiency} />
+      </div>
+
+      {/* Row 3: Top Contractors & Top Teams */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <TopContractorsCard
           contractors={topContractors}
           lastWeekContractors={lastWeekContractors}
+        />
+        <TopTeamsCard
+          teams={topTeams}
+          lastWeekTeams={lastWeekTeams}
         />
       </div>
     </div>
@@ -380,6 +399,79 @@ function TopContractorsCard({ contractors, lastWeekContractors }) {
             <div className="pt-3 border-t border-gray-200 flex justify-between text-sm font-medium">
               <span>Total Contractor Hours</span>
               <span>{Math.round(contractors.reduce((sum, c) => sum + c.totalHours, 0))} hrs</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Top Teams Card
+ */
+function TopTeamsCard({ teams, lastWeekTeams }) {
+  // Create lookup for last week's hours
+  const lastWeekMap = new Map(
+    lastWeekTeams.map(t => [t.id, t.totalHours])
+  );
+
+  // Format team type for display
+  const formatTeamType = (type) => {
+    const typeMap = {
+      'team_usta': 'USTA',
+      'team_hs': 'HS',
+      'team_college': 'College',
+      'team_other': 'Other',
+    };
+    return typeMap[type] || '';
+  };
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200">
+      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+        <h3 className="font-medium text-gray-900">Top Teams (hours)</h3>
+      </div>
+      <div className="p-4">
+        {teams.length === 0 ? (
+          <div className="text-sm text-gray-500">No team bookings this week</div>
+        ) : (
+          <div className="space-y-3">
+            {teams.slice(0, 5).map((team, index) => {
+              const lastWeekHours = lastWeekMap.get(team.id) || 0;
+              const change = team.totalHours - lastWeekHours;
+
+              return (
+                <div key={team.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-400 w-4">
+                      {index + 1}.
+                    </span>
+                    <span className="text-sm text-gray-900">{team.name}</span>
+                    {team.type && (
+                      <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                        {formatTeamType(team.type)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-medium text-gray-900">
+                      {Math.round(team.totalHours)} hrs
+                    </span>
+                    {change !== 0 && (
+                      <span className={`text-xs ${change > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {change > 0 ? '+' : ''}{Math.round(change)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Total */}
+            <div className="pt-3 border-t border-gray-200 flex justify-between text-sm font-medium">
+              <span>Total Team Hours</span>
+              <span>{Math.round(teams.reduce((sum, t) => sum + t.totalHours, 0))} hrs</span>
             </div>
           </div>
         )}
