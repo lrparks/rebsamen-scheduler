@@ -5,7 +5,7 @@
 Add a comprehensive Reports/Analytics system to the Rebsamen Tennis Center scheduler with three report tiers:
 1. **Daily Dashboard** - Real-time operational metrics for staff
 2. **Weekly Summary** - Week-over-week comparison for managers
-3. **Monthly Performance** - Board-level reporting with YoY analysis
+3. **Monthly Performance** - Board-level reporting with YoY & MoM analysis
 
 ---
 
@@ -196,7 +196,7 @@ Add participation metrics to Weekly/Monthly:
 Full implementation of the board report format:
 
 1. **Executive Summary**
-   - Court Hours Booked (with YoY if prior year data exists)
+   - Court Hours Booked (with YoY and MoM if prior year data exists)
    - Total Revenue
    - Cost Recovery % (requires manual input or config)
 
@@ -245,7 +245,7 @@ Add to config or separate sheet:
 **Effort: ~2-3 days (future phase)**
 
 Not in immediate scope, but planned:
-- YoY comparison charts
+- YoY and MoM comparison charts
 - Seasonal pattern analysis
 - Forecasting/predictions
 - Custom date range reports
