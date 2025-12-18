@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchClosures } from '../utils/api.js';
-import { normalizeTime } from '../utils/dateHelpers.js';
+import { parseTimeToMinutes } from '../utils/timeUtils.js';
 
 /**
  * Hook for fetching and managing court closures data
@@ -119,18 +119,4 @@ export function useClosures() {
   };
 }
 
-/**
- * Parse time string to minutes since midnight
- * @param {string|number} time - HH:MM format or decimal
- * @returns {number}
- */
-function parseTimeToMinutes(time) {
-  if (!time && time !== 0) return 0;
-  const normalized = normalizeTime(time);
-  if (!normalized || typeof normalized !== 'string' || !normalized.includes(':')) return 0;
-  const parts = normalized.split(':');
-  if (parts.length < 2) return 0;
-  const hours = parseInt(parts[0], 10) || 0;
-  const minutes = parseInt(parts[1], 10) || 0;
-  return hours * 60 + minutes;
-}
+// parseTimeToMinutes is now imported from '../utils/timeUtils.js'
