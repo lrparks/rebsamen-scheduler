@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useBookingsContext } from '../../context/BookingsContext.jsx';
 import { useContractors } from '../../hooks/useContractors.js';
 import { useTeams } from '../../hooks/useTeams.js';
@@ -13,6 +13,7 @@ import {
   getTeamHoursForRange,
   formatCurrency,
 } from '../../utils/reportUtils.js';
+import { fetchMaintenanceLog, fetchMaintenanceTasks } from '../../utils/api.js';
 
 /**
  * Weekly Summary Report - Week over week comparison
@@ -21,6 +22,30 @@ export default function WeeklySummary({ weekStart }) {
   const { bookings, loading } = useBookingsContext();
   const { contractors } = useContractors();
   const { teams } = useTeams();
+
+  // Maintenance data
+  const [maintenanceLog, setMaintenanceLog] = useState([]);
+  const [maintenanceTasks, setMaintenanceTasks] = useState([]);
+  const [maintenanceLoading, setMaintenanceLoading] = useState(true);
+
+  // Load maintenance data
+  useEffect(() => {
+    const loadMaintenance = async () => {
+      try {
+        const [log, tasks] = await Promise.all([
+          fetchMaintenanceLog(),
+          fetchMaintenanceTasks(),
+        ]);
+        setMaintenanceLog(log);
+        setMaintenanceTasks(tasks.filter(t => t.is_active === 'TRUE'));
+      } catch (error) {
+        console.error('Error loading maintenance data:', error);
+      } finally {
+        setMaintenanceLoading(false);
+      }
+    };
+    loadMaintenance();
+  }, []);
 
   // Calculate date range
   const startDate = formatDateISO(weekStart);
@@ -112,6 +137,14 @@ export default function WeeklySummary({ weekStart }) {
           lastWeekTeams={lastWeekTeams}
         />
       </div>
+
+      {/* Maintenance Summary - Full Width */}
+      <MaintenanceCard
+        weekStart={weekStart}
+        maintenanceLog={maintenanceLog}
+        maintenanceTasks={maintenanceTasks}
+        loading={maintenanceLoading}
+      />
     </div>
   );
 }
@@ -478,4 +511,166 @@ function TopTeamsCard({ teams, lastWeekTeams }) {
       </div>
     </div>
   );
+}
+
+/**
+ * Maintenance Summary Card - Week Overview
+ */
+function MaintenanceCard({ weekStart, maintenanceLog, maintenanceTasks, loading }) {
+  const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  // Get week dates from weekStart
+  const getWeekDates = () => {
+    const dates = [];
+    const start = new Date(weekStart);
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      dates.push(formatDateISO(d));
+    }
+    return dates;
+  };
+
+  const weekDates = getWeekDates();
+  const today = formatDateISO(new Date());
+
+  const dailyTasks = maintenanceTasks.filter(t => t.frequency === 'daily');
+
+  const getTaskStatus = (taskId, date) => {
+    const entry = maintenanceLog.find(e =>
+      e.task_id === taskId &&
+      (e.date === date || e.completed_date === date) &&
+      e.status === 'completed'
+    );
+
+    if (!entry) {
+      if (date > today) return 'pending';
+      return 'not_done';
+    }
+
+    if (entry.follow_up_needed === 'TRUE') return 'issue';
+    return 'complete';
+  };
+
+  // Get follow-ups for this week
+  const weekFollowUps = maintenanceLog.filter(e => {
+    if (e.follow_up_needed !== 'TRUE') return false;
+    const entryDate = e.date || e.completed_date;
+    return entryDate >= weekDates[0] && entryDate <= weekDates[6];
+  }).sort((a, b) => {
+    const dateA = a.date || a.completed_date;
+    const dateB = b.date || b.completed_date;
+    return dateB.localeCompare(dateA);
+  });
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200">
+        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+          <h3 className="font-medium text-gray-900">Weekly Maintenance</h3>
+        </div>
+        <div className="p-4 text-sm text-gray-500">Loading maintenance data...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200">
+      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+        <h3 className="font-medium text-gray-900">Weekly Maintenance</h3>
+      </div>
+      <div className="p-4">
+        {/* Weekly Grid */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="text-left py-2 pr-4 font-medium text-gray-700">Task</th>
+                {weekDates.map((date, i) => {
+                  const isToday = date === today;
+                  return (
+                    <th
+                      key={date}
+                      className={`text-center py-2 px-2 font-medium ${isToday ? 'text-green-700 bg-green-50' : 'text-gray-700'}`}
+                    >
+                      {DAYS[i]}
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {dailyTasks.slice(0, 6).map(task => (
+                <tr key={task.task_id} className="border-b border-gray-100">
+                  <td className="py-2 pr-4 text-gray-900 truncate max-w-[200px]" title={task.task_name}>
+                    {task.task_name}
+                  </td>
+                  {weekDates.map((date) => {
+                    const status = getTaskStatus(task.task_id, date);
+                    const isToday = date === today;
+                    return (
+                      <td
+                        key={date}
+                        className={`text-center py-2 px-2 ${isToday ? 'bg-green-50' : ''}`}
+                      >
+                        <StatusIcon status={status} />
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Legend */}
+        <div className="mt-3 flex flex-wrap gap-4 text-xs text-gray-500">
+          <span><StatusIcon status="complete" /> Complete</span>
+          <span><StatusIcon status="issue" /> Issue Found</span>
+          <span><StatusIcon status="not_done" /> Not Done</span>
+          <span><StatusIcon status="pending" /> Pending</span>
+        </div>
+
+        {/* Follow-ups for this week */}
+        {weekFollowUps.length > 0 && (
+          <div className="mt-4 border-t border-gray-200 pt-4">
+            <h4 className="text-sm font-medium text-amber-700 mb-3">
+              ⚠️ Follow-ups This Week ({weekFollowUps.length})
+            </h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+              {weekFollowUps.slice(0, 6).map((entry, idx) => (
+                <div key={idx} className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <div className="text-sm font-medium text-amber-900 line-clamp-2">
+                    {entry.court && entry.court !== 'all' ? `Ct ${entry.court}: ` : ''}
+                    {entry.follow_up_note || entry.task_name}
+                  </div>
+                  <div className="text-xs text-amber-700 mt-1">
+                    {entry.date || entry.completed_date} • {entry.completed_by}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Status icon for maintenance grid
+ */
+function StatusIcon({ status }) {
+  switch (status) {
+    case 'complete':
+      return <span className="text-green-600">✓</span>;
+    case 'issue':
+      return <span className="text-amber-600">⚠</span>;
+    case 'not_done':
+      return <span className="text-red-600">✗</span>;
+    case 'pending':
+      return <span className="text-gray-400">○</span>;
+    default:
+      return <span className="text-gray-300">—</span>;
+  }
 }

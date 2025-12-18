@@ -265,15 +265,18 @@ function AvailableSlotsBar({ availabilityGrid, utilization }) {
         className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors rounded-lg"
       >
         <div className="flex items-center gap-3">
-          <svg
-            className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-          <h3 className="font-medium text-gray-900">View Available Slots</h3>
+          {/* Toggle Switch Indicator */}
+          <div className={`relative w-10 h-5 rounded-full transition-colors ${isExpanded ? 'bg-green-500' : 'bg-gray-300'}`}>
+            <div
+              className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                isExpanded ? 'translate-x-5' : 'translate-x-0.5'
+              }`}
+            />
+          </div>
+          <h3 className="font-medium text-gray-900">
+            {isExpanded ? 'Hide' : 'Show'} Available Slots
+          </h3>
+          <span className="text-xs text-gray-500">(click to {isExpanded ? 'collapse' : 'expand'})</span>
         </div>
         <span className={`text-sm font-medium ${totalAvailable < 20 ? 'text-amber-600' : 'text-green-600'}`}>
           {totalAvailable} slots open
