@@ -111,80 +111,137 @@ select {
     margin: 0 !important;
   }
 
-  /* Print header */
+  /* Print header - repeat on each page */
   .print-header {
     display: block !important;
     text-align: center;
-    padding: 0.5rem 0;
+    padding: 0.25rem 0;
     border-bottom: 2px solid #000;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
+    position: running(header);
+  }
+
+  @page {
+    size: landscape;
+    margin: 0.5in 0.25in;
+    @top-center {
+      content: element(header);
+    }
   }
 
   .print-header h1 {
-    font-size: 1.25rem;
+    font-size: 1rem;
     margin: 0;
     font-weight: bold;
   }
 
   .print-header p {
-    font-size: 0.875rem;
-    margin: 0.25rem 0 0;
+    font-size: 0.75rem;
+    margin: 0.125rem 0 0;
     color: #666;
   }
 
-  /* Grid adjustments for print */
+  /* Grid adjustments for print - critical for showing bookings */
   .print-grid {
     border: 1px solid #000 !important;
-    page-break-inside: avoid;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
   }
 
-  .print-grid .booking-cell {
-    border: 1px solid #999 !important;
-    font-size: 0.65rem !important;
-    padding: 2px !important;
+  .print-grid > div {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  /* Fix absolute positioned booking cells */
+  .print-grid [class*="absolute"] {
+    position: relative !important;
+  }
+
+  /* Make cells visible */
+  .print-grid .relative {
+    overflow: visible !important;
+  }
+
+  /* Booking cell styling for print */
+  .print-grid .rounded-sm,
+  .print-grid .rounded {
+    border: 1px solid #666 !important;
+    font-size: 0.6rem !important;
+    padding: 1px 2px !important;
+    overflow: hidden !important;
+    height: auto !important;
+    min-height: 100% !important;
   }
 
   /* Booking colors for print (simplified) */
   .print-grid [class*="bg-blue"] {
-    background-color: #e0e7ff !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    background-color: #dbeafe !important;
   }
 
   .print-grid [class*="bg-green"] {
     background-color: #d1fae5 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
   }
 
   .print-grid [class*="bg-amber"],
   .print-grid [class*="bg-yellow"] {
     background-color: #fef3c7 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
   }
 
   .print-grid [class*="bg-purple"] {
     background-color: #ede9fe !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
   }
 
-  .print-grid [class*="bg-red"] {
+  .print-grid [class*="bg-red"],
+  .print-grid [class*="bg-rose"] {
     background-color: #fee2e2 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
   }
 
-  /* Page setup */
-  @page {
-    size: landscape;
-    margin: 0.5in;
+  .print-grid [class*="bg-orange"] {
+    background-color: #ffedd5 !important;
   }
 
-  /* Force background colors */
+  .print-grid [class*="bg-gray"] {
+    background-color: #f3f4f6 !important;
+  }
+
+  /* Force background colors to print */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  /* Hide scrollbars */
+  ::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  /* Ensure grid cells have proper height */
+  .print-grid .h-16 {
+    height: 3rem !important;
+    min-height: 3rem !important;
+  }
+
+  .print-grid .h-12 {
+    height: 2.5rem !important;
+  }
+
+  /* Column widths for print */
+  .print-grid .min-w-20 {
+    min-width: 4rem !important;
+    width: 4rem !important;
+  }
+
+  .print-grid .min-w-24 {
+    min-width: 5rem !important;
+    width: 5rem !important;
+  }
+
+  /* Time column */
+  .print-grid .w-16 {
+    width: 3rem !important;
+    min-width: 3rem !important;
   }
 }
