@@ -3,12 +3,15 @@ import { formatTimeShort } from '../../utils/dateHelpers.js';
 
 /**
  * Individual booking cell in the grid
+ * Supports side-by-side display for overlapping bookings
  */
 export default function BookingCell({
   booking,
   onClick,
   isFirstSlot = true,
   slotsSpanned = 1,
+  overlapCount = 1,
+  overlapIndex = 0,
 }) {
   if (!booking) return null;
 
@@ -24,11 +27,16 @@ export default function BookingCell({
   // Each slot is h-16 (64px), minus 1px for border
   const height = slotsSpanned * 64 - 1;
 
+  // Calculate width and position for overlapping bookings
+  // Each booking gets an equal share of the cell width
+  const widthPercent = 100 / overlapCount;
+  const leftPercent = overlapIndex * widthPercent;
+
   return (
     <button
       onClick={() => onClick(booking)}
       className={`
-        absolute inset-x-0.5 overflow-hidden rounded
+        absolute overflow-hidden rounded
         text-left cursor-pointer transition-all
         hover:shadow-md hover:z-20
         ${colorClasses}
@@ -37,6 +45,8 @@ export default function BookingCell({
       style={{
         height: `${height}px`,
         top: 0,
+        left: `calc(${leftPercent}% + 2px)`,
+        width: `calc(${widthPercent}% - 4px)`,
       }}
       title={`${booking.customer_name || booking.entity_id || 'Booking'} - ${formatTimeShort(booking.time_start)} to ${formatTimeShort(booking.time_end)}`}
     >

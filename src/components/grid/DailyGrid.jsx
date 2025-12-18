@@ -43,10 +43,11 @@ export default function DailyGrid({
     }));
   }, [courts]);
 
-  // Build booking map for quick lookup
+  // Build booking map for quick lookup - supports overlapping bookings
   const bookingMap = useMemo(() => {
     const map = new Map();
 
+    // First pass: collect all bookings per slot
     bookings.forEach((booking) => {
       if (booking.status === 'cancelled') return;
 
@@ -58,24 +59,30 @@ export default function DailyGrid({
       const endIndex = timeSlots.indexOf(endTime);
       const slotsSpanned = endIndex > startIndex ? endIndex - startIndex : 1;
 
-      const key = `${court}-${startTime}`;
-      map.set(key, {
-        booking,
-        isFirstSlot: true,
-        slotsSpanned,
-      });
-
-      for (let i = 1; i < slotsSpanned; i++) {
+      // Add to each slot this booking occupies
+      for (let i = 0; i < slotsSpanned; i++) {
         const slotTime = timeSlots[startIndex + i];
         if (slotTime) {
-          const occupiedKey = `${court}-${slotTime}`;
-          map.set(occupiedKey, {
+          const key = `${court}-${slotTime}`;
+          if (!map.has(key)) {
+            map.set(key, []);
+          }
+          map.get(key).push({
             booking,
-            isFirstSlot: false,
-            slotsSpanned: 0,
+            isFirstSlot: i === 0,
+            slotsSpanned: i === 0 ? slotsSpanned : 0,
           });
         }
       }
+    });
+
+    // Second pass: calculate overlap positions for each slot
+    map.forEach((bookingsInSlot, key) => {
+      const count = bookingsInSlot.length;
+      bookingsInSlot.forEach((item, index) => {
+        item.overlapCount = count;
+        item.overlapIndex = index;
+      });
     });
 
     return map;
@@ -219,22 +226,28 @@ export default function DailyGrid({
                 {timeSlots.map((time, timeIndex) => {
                   const courtNum = parseInt(court.court_number, 10);
                   const key = `${courtNum}-${time}`;
-                  const cellData = bookingMap.get(key);
+                  const cellDataArray = bookingMap.get(key);
                   const isSelected = isCellSelected(courtNum, timeIndex);
-                  const closureInfo = !cellData ? isSlotClosed(selectedDate, courtNum, time) : null;
+                  const closureInfo = !cellDataArray ? isSlotClosed(selectedDate, courtNum, time) : null;
 
                   return (
                     <div
                       key={time}
                       className="relative h-16 border-b border-gray-100"
                     >
-                      {cellData ? (
-                        <BookingCell
-                          booking={cellData.booking}
-                          onClick={onBookingClick}
-                          isFirstSlot={cellData.isFirstSlot}
-                          slotsSpanned={cellData.slotsSpanned}
-                        />
+                      {cellDataArray && cellDataArray.length > 0 ? (
+                        // Render all overlapping bookings
+                        cellDataArray.map((cellData, idx) => (
+                          <BookingCell
+                            key={cellData.booking.booking_id}
+                            booking={cellData.booking}
+                            onClick={onBookingClick}
+                            isFirstSlot={cellData.isFirstSlot}
+                            slotsSpanned={cellData.slotsSpanned}
+                            overlapCount={cellData.overlapCount}
+                            overlapIndex={cellData.overlapIndex}
+                          />
+                        ))
                       ) : closureInfo?.isClosed ? (
                         <ClosedCell reason={closureInfo.reason} />
                       ) : (
