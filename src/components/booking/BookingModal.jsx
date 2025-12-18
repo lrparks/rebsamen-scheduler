@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Modal from '../common/Modal.jsx';
 import Button from '../common/Button.jsx';
 import BookingForm from './BookingForm.jsx';
@@ -7,12 +7,74 @@ import CheckInButton from './CheckInButton.jsx';
 import CancelModal from './CancelModal.jsx';
 import { generateBookingId, generateGroupId } from '../../utils/bookingId.js';
 import { createBooking, updateBooking } from '../../utils/api.js';
-import { formatDateISO } from '../../utils/dateHelpers.js';
-import { BOOKING_TYPES, PAYMENT_STATUS } from '../../config.js';
+import { formatDateISO, formatDateDisplay, formatTimeDisplay } from '../../utils/dateHelpers.js';
+import { BOOKING_TYPES, PAYMENT_STATUS, CONFIG } from '../../config.js';
 import { useStaffContext } from '../../context/StaffContext.jsx';
 import { useBookingsContext } from '../../context/BookingsContext.jsx';
 import { useToast } from '../common/Toast.jsx';
 import { canMarkNoShow } from '../../utils/cancellationPolicy.js';
+
+/**
+ * Generate dates for recurring weekly bookings
+ */
+function generateRecurringDates(startDate, weeks) {
+  const dates = [];
+  const start = new Date(startDate + 'T12:00:00');
+  for (let i = 0; i < weeks; i++) {
+    const date = new Date(start);
+    date.setDate(date.getDate() + (i * 7));
+    dates.push(formatDateISO(date));
+  }
+  return dates;
+}
+
+/**
+ * Conflict Warning Component
+ */
+function ConflictWarning({ conflicts, onProceed, onCancel }) {
+  return (
+    <div className="space-y-4">
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+        <div className="flex items-start gap-3">
+          <svg className="w-6 h-6 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <div>
+            <h4 className="font-medium text-amber-800">Booking Conflicts Detected</h4>
+            <p className="text-sm text-amber-700 mt-1">
+              {conflicts.length} slot{conflicts.length > 1 ? 's' : ''} already {conflicts.length > 1 ? 'have' : 'has'} existing bookings:
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-h-60 overflow-y-auto space-y-2">
+        {conflicts.map((conflict, idx) => (
+          <div key={idx} className="bg-gray-50 rounded-lg p-3 text-sm">
+            <div className="font-medium text-gray-900">
+              {formatDateDisplay(conflict.date)} - Court {conflict.court === CONFIG.STADIUM_COURT_NUMBER ? 'Stadium' : conflict.court}
+            </div>
+            <div className="text-gray-600">
+              {formatTimeDisplay(conflict.time_start)} - {formatTimeDisplay(conflict.time_end)}
+            </div>
+            <div className="text-gray-500">
+              {conflict.customer_name || conflict.booking_type} ({conflict.booking_id})
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-3 pt-2">
+        <Button variant="secondary" onClick={onCancel} fullWidth>
+          Go Back & Fix
+        </Button>
+        <Button variant="warning" onClick={onProceed} fullWidth>
+          Create Anyway (Skip Conflicts)
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Main booking modal for create/view/edit
@@ -23,15 +85,17 @@ export default function BookingModal({
   booking = null,
   initialData = null,
 }) {
-  const [mode, setMode] = useState('view'); // 'view', 'edit', 'create'
+  const [mode, setMode] = useState('view'); // 'view', 'edit', 'create', 'conflicts'
   const [formData, setFormData] = useState({});
   const [loading, setLoading] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [isNoShowCancel, setIsNoShowCancel] = useState(false);
   const [createdBookingId, setCreatedBookingId] = useState(null);
+  const [conflicts, setConflicts] = useState([]);
+  const [pendingBookings, setPendingBookings] = useState([]);
 
   const { initials } = useStaffContext();
-  const { addBookingLocal, updateBookingLocal, refreshBookings } = useBookingsContext();
+  const { addBookingLocal, updateBookingLocal, refreshBookings, getConflicts, getClosureConflicts } = useBookingsContext();
   const toast = useToast();
 
   // Determine mode and initialize form data
@@ -108,7 +172,7 @@ export default function BookingModal({
     setFormData(prev => ({ ...prev, ...updates }));
   };
 
-  const handleCreate = async () => {
+  const handleCreate = async (skipConflictCheck = false) => {
     if (!initials) {
       toast.error('Please select a staff member first');
       return;
@@ -124,50 +188,101 @@ export default function BookingModal({
       return;
     }
 
-    setLoading(true);
-    try {
-      // Get all dates (for multi-day) and courts (for multi-court)
-      const dates = formData.dates || [formData.date];
-      const courts = formData.courts;
-      const isGroup = dates.length > 1 || courts.length > 1;
-      const groupId = isGroup ? generateGroupId(new Date(dates[0])) : null;
+    // Get all dates - handle recurring bookings
+    let dates = formData.dates || [formData.date];
+    if (formData.recurring && formData.recurringWeeks > 1) {
+      dates = generateRecurringDates(formData.date, formData.recurringWeeks);
+    }
+    const courts = formData.courts;
+    const isGroup = dates.length > 1 || courts.length > 1;
+    const groupId = isGroup ? generateGroupId(new Date(dates[0])) : null;
 
-      // Create booking for each date-court combination
-      const bookings = [];
-      for (const date of dates) {
-        for (const court of courts) {
-          bookings.push({
-            booking_id: generateBookingId(date, court, formData.timeStart),
-            group_id: groupId,
-            date: date,
-            court: court,
-            time_start: formData.timeStart,
-            time_end: formData.timeEnd,
-            booking_type: formData.bookingType,
-            entity_id: formData.entityId || '',
-            customer_name: formData.customerName,
-            customer_phone: formData.customerPhone,
-            payment_status: formData.paymentStatus,
-            payment_amount: formData.paymentAmount,
-            payment_method: formData.paymentMethod,
-            notes: formData.notes,
-            status: 'active',
-            created_by: initials,
-            created_at: new Date().toISOString(),
+    // Build all proposed bookings
+    const proposedBookings = [];
+    for (const date of dates) {
+      for (const court of courts) {
+        proposedBookings.push({
+          booking_id: generateBookingId(date, court, formData.timeStart),
+          group_id: groupId,
+          date: date,
+          court: court,
+          time_start: formData.timeStart,
+          time_end: formData.timeEnd,
+          booking_type: formData.bookingType,
+          entity_id: formData.entityId || '',
+          customer_name: formData.customerName,
+          customer_phone: formData.customerPhone,
+          payment_status: formData.paymentStatus,
+          payment_amount: formData.paymentAmount,
+          payment_method: formData.paymentMethod,
+          notes: formData.notes,
+          status: 'active',
+          created_by: initials,
+          created_at: new Date().toISOString(),
+        });
+      }
+    }
+
+    // Check for conflicts unless skipped
+    if (!skipConflictCheck) {
+      const allConflicts = [];
+      for (const booking of proposedBookings) {
+        // Check booking conflicts
+        const bookingConflicts = getConflicts(
+          booking.date,
+          booking.court,
+          booking.time_start,
+          booking.time_end
+        );
+        allConflicts.push(...bookingConflicts);
+
+        // Check closure conflicts
+        const closureConflicts = getClosureConflicts(
+          booking.date,
+          booking.court,
+          booking.time_start,
+          booking.time_end
+        );
+        // Add closure info as pseudo-bookings for display
+        closureConflicts.forEach(closure => {
+          allConflicts.push({
+            booking_id: `CLOSURE-${closure.date}-${closure.court}`,
+            date: closure.date,
+            court: closure.court === 'all' ? 'All Courts' : closure.court,
+            time_start: closure.time_start || '00:00',
+            time_end: closure.time_end || '21:00',
+            customer_name: `CLOSED: ${closure.reason || 'Court Closure'}`,
+            booking_type: 'closure',
           });
-        }
+        });
       }
 
-      const result = await createBooking(bookings.length === 1 ? bookings[0] : bookings);
+      if (allConflicts.length > 0) {
+        // Show conflict warning
+        setConflicts(allConflicts);
+        setPendingBookings(proposedBookings);
+        setMode('conflicts');
+        return;
+      }
+    }
+
+    // Proceed with creation
+    await createBookings(proposedBookings);
+  };
+
+  const createBookings = async (bookingsToCreate) => {
+    setLoading(true);
+    try {
+      const result = await createBooking(bookingsToCreate.length === 1 ? bookingsToCreate[0] : bookingsToCreate);
 
       if (result.success) {
         // Optimistic update
-        bookings.forEach(b => addBookingLocal(b));
+        bookingsToCreate.forEach(b => addBookingLocal(b));
 
         // Show success with booking ID
-        const primaryId = bookings[0].booking_id;
+        const primaryId = bookingsToCreate[0].booking_id;
         setCreatedBookingId(primaryId);
-        const count = bookings.length;
+        const count = bookingsToCreate.length;
         toast.success(count > 1 ? `${count} bookings created` : `Booking created: ${primaryId}`);
 
         // Refresh data
@@ -181,6 +296,30 @@ export default function BookingModal({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleProceedWithConflicts = async () => {
+    // Filter out bookings that have conflicts
+    const conflictKeys = new Set(
+      conflicts.map(c => `${c.date}-${c.court}`)
+    );
+    const nonConflictingBookings = pendingBookings.filter(
+      b => !conflictKeys.has(`${b.date}-${b.court}`)
+    );
+
+    if (nonConflictingBookings.length === 0) {
+      toast.error('All selected slots have conflicts');
+      setMode('create');
+      return;
+    }
+
+    await createBookings(nonConflictingBookings);
+  };
+
+  const handleCancelConflicts = () => {
+    setConflicts([]);
+    setPendingBookings([]);
+    setMode('create');
   };
 
   const handleUpdate = async () => {
@@ -310,11 +449,19 @@ export default function BookingModal({
             ? 'New Booking'
             : mode === 'edit'
               ? 'Edit Booking'
-              : `Booking: ${booking?.booking_id || ''}`
+              : mode === 'conflicts'
+                ? 'Booking Conflicts'
+                : `Booking: ${booking?.booking_id || ''}`
         }
         size="lg"
       >
-        {mode === 'view' && booking ? (
+        {mode === 'conflicts' ? (
+          <ConflictWarning
+            conflicts={conflicts}
+            onProceed={handleProceedWithConflicts}
+            onCancel={handleCancelConflicts}
+          />
+        ) : mode === 'view' && booking ? (
           <div className="space-y-4">
             <BookingDetails booking={booking} />
 

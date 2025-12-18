@@ -174,6 +174,23 @@ export async function fetchTournaments() {
   return data;
 }
 
+/**
+ * Fetch court closures data
+ * Expected columns: date, court (number or "all"), time_start, time_end, reason, is_active
+ * @returns {Promise<Array>}
+ */
+export async function fetchClosures() {
+  try {
+    const data = await fetchCSV(CONFIG.CSV_URLS.closures);
+    console.log('[API] Fetched closures:', data.length);
+    return data;
+  } catch (error) {
+    // If the closures sheet doesn't exist yet, return empty array
+    console.log('[API] No closures sheet found, returning empty array');
+    return [];
+  }
+}
+
 // ============================================
 // TEAM CRUD OPERATIONS
 // ============================================

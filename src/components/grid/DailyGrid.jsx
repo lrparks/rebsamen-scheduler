@@ -7,6 +7,7 @@ import TimeColumn, { TIME_SLOT_HEIGHT } from './TimeColumn.jsx';
 import CourtHeader from './CourtHeader.jsx';
 import CurrentTimeLine from './CurrentTimeLine.jsx';
 import BookingCell from './BookingCell.jsx';
+import ClosedCell from './ClosedCell.jsx';
 
 /**
  * Main daily grid view showing all 17 courts
@@ -17,7 +18,7 @@ export default function DailyGrid({
   onBookingClick,
   onEmptyCellClick,
 }) {
-  const { getBookingsForDate, loading, error } = useBookingsContext();
+  const { getBookingsForDate, loading, error, isSlotClosed } = useBookingsContext();
   const { courts } = useCourts();
 
   const timeSlots = getTimeSlots();
@@ -220,6 +221,7 @@ export default function DailyGrid({
                   const key = `${courtNum}-${time}`;
                   const cellData = bookingMap.get(key);
                   const isSelected = isCellSelected(courtNum, timeIndex);
+                  const closureInfo = !cellData ? isSlotClosed(selectedDate, courtNum, time) : null;
 
                   return (
                     <div
@@ -233,6 +235,8 @@ export default function DailyGrid({
                           isFirstSlot={cellData.isFirstSlot}
                           slotsSpanned={cellData.slotsSpanned}
                         />
+                      ) : closureInfo?.isClosed ? (
+                        <ClosedCell reason={closureInfo.reason} />
                       ) : (
                         <EmptyCell
                           court={courtNum}
