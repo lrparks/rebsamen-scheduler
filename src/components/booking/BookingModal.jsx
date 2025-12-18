@@ -240,7 +240,11 @@ export default function BookingModal({
 
     // Build all proposed bookings
     const proposedBookings = [];
-    let isFirstBooking = true;
+    const totalBookings = dates.length * courts.length;
+    // Apportion payment across all bookings in the group
+    const paymentPerBooking = totalBookings > 1
+      ? (parseFloat(formData.paymentAmount) / totalBookings).toFixed(2)
+      : formData.paymentAmount;
     for (const date of dates) {
       for (const court of courts) {
         proposedBookings.push({
@@ -255,8 +259,7 @@ export default function BookingModal({
           customer_name: formData.customerName,
           customer_phone: formData.customerPhone,
           payment_status: formData.paymentStatus,
-          // Only put payment on first booking of group to avoid double-counting
-          payment_amount: isFirstBooking ? formData.paymentAmount : '0',
+          payment_amount: paymentPerBooking,
           payment_method: formData.paymentMethod,
           notes: formData.notes,
           participant_count: formData.participantCount || 2,
@@ -265,7 +268,6 @@ export default function BookingModal({
           created_by: initials,
           created_at: new Date().toISOString(),
         });
-        isFirstBooking = false;
       }
     }
 
