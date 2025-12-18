@@ -1,73 +1,28 @@
 import { CONFIG } from '../config.js';
+import {
+  normalizeTime as normalizeTimeFromUtils,
+  parseTimeToMinutes,
+  parseHour,
+  parseMinutes,
+  formatTimeShort as formatTimeShortFromUtils,
+  formatTimeDisplay as formatTimeDisplayFromUtils,
+} from './timeUtils.js';
+
+// Re-export time functions from timeUtils for backward compatibility
+export { normalizeTimeFromUtils as normalizeTime };
+export { formatTimeShortFromUtils as formatTimeShort };
+export { formatTimeDisplayFromUtils as formatTimeDisplay };
 
 /**
- * Normalize time to HH:MM format
- * Handles: HH:MM, H:MM, decimal (0.375), 12-hour AM/PM
- * @param {string|number} time
- * @returns {string} Time in HH:MM format (empty string if invalid)
- */
-export function normalizeTime(time) {
-  if (!time && time !== 0) return '';
-
-  // Ensure we have a string
-  let str;
-  try {
-    str = String(time).trim();
-  } catch (e) {
-    console.error('[normalizeTime] Error converting time to string:', time, e);
-    return '';
-  }
-
-  if (!str || typeof str !== 'string') return '';
-
-  // Already in HH:MM or H:MM format
-  const timeMatch = str.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
-  if (timeMatch) {
-    const [, hours, minutes] = timeMatch;
-    return `${hours.padStart(2, '0')}:${minutes}`;
-  }
-
-  // Handle decimal format (Google Sheets stores times as fractions of a day)
-  const decimal = parseFloat(str);
-  if (!isNaN(decimal) && decimal >= 0 && decimal < 1) {
-    const totalMinutes = Math.round(decimal * 24 * 60);
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-  }
-
-  // Handle 12-hour format with AM/PM
-  const ampmMatch = str.match(/^(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)$/i);
-  if (ampmMatch) {
-    let [, hours, minutes, period] = ampmMatch;
-    let h = parseInt(hours, 10);
-    if (period.toLowerCase() === 'pm' && h !== 12) h += 12;
-    if (period.toLowerCase() === 'am' && h === 12) h = 0;
-    return `${h.toString().padStart(2, '0')}:${minutes}`;
-  }
-
-  // Return original string if it looks like a time, otherwise empty
-  if (str.includes(':')) return str;
-  return '';
-}
-
-/**
- * Parse time string to hours and minutes
+ * Parse time string to hours and minutes (using centralized timeUtils)
  * @param {string|number} time
  * @returns {{ hours: number, minutes: number }}
  */
 function parseTime(time) {
-  const normalized = normalizeTime(time);
-  if (!normalized || typeof normalized !== 'string' || !normalized.includes(':')) {
-    return { hours: 0, minutes: 0 };
-  }
-  const parts = normalized.split(':');
-  if (parts.length < 2) {
-    return { hours: 0, minutes: 0 };
-  }
-  const hours = parseInt(parts[0], 10) || 0;
-  const minutes = parseInt(parts[1], 10) || 0;
-  return { hours, minutes };
+  return {
+    hours: parseHour(time),
+    minutes: parseMinutes(time),
+  };
 }
 
 /**
@@ -112,31 +67,7 @@ export function formatDateShort(date) {
   });
 }
 
-/**
- * Format time for display (e.g., "9:00 AM")
- * @param {string|number} time24 - Time in HH:MM format or decimal
- * @returns {string}
- */
-export function formatTimeDisplay(time24) {
-  if (!time24) return '';
-  const { hours, minutes } = parseTime(time24);
-  const period = hours >= 12 ? 'PM' : 'AM';
-  const displayHours = hours % 12 || 12;
-  return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
-}
-
-/**
- * Format time short (e.g., "9:00a")
- * @param {string|number} time24 - Time in HH:MM format or decimal
- * @returns {string}
- */
-export function formatTimeShort(time24) {
-  if (!time24) return '';
-  const { hours, minutes } = parseTime(time24);
-  const period = hours >= 12 ? 'p' : 'a';
-  const displayHours = hours % 12 || 12;
-  return `${displayHours}:${String(minutes).padStart(2, '0')}${period}`;
-}
+// formatTimeDisplay and formatTimeShort are now imported from timeUtils.js
 
 /**
  * Get all time slots for the day

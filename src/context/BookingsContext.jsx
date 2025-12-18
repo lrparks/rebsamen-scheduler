@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { fetchBookings as apiFetchBookings, fetchClosures } from '../utils/api.js';
 import { CONFIG } from '../config.js';
+import { parseTimeToMinutes } from '../utils/timeUtils.js';
 
 const BookingsContext = createContext(null);
 
@@ -257,44 +258,4 @@ export function useBookingsContext() {
   return context;
 }
 
-/**
- * Parse time string to minutes since midnight
- * @param {string|number} time - HH:MM format or decimal (0.375 = 9:00)
- * @returns {number}
- */
-function parseTimeToMinutes(time) {
-  if (!time && time !== 0) return 0;
-
-  // Ensure we have a string
-  let timeStr;
-  try {
-    timeStr = String(time).trim();
-  } catch (e) {
-    console.error('[parseTimeToMinutes] Error converting time to string:', time, e);
-    return 0;
-  }
-
-  // Safety check - ensure timeStr is actually a string with split method
-  if (typeof timeStr !== 'string' || typeof timeStr.split !== 'function') {
-    console.error('[parseTimeToMinutes] timeStr is not a valid string:', timeStr, typeof timeStr);
-    return 0;
-  }
-
-  // If it's already HH:MM format
-  if (timeStr.includes(':')) {
-    const parts = timeStr.split(':');
-    if (parts.length >= 2) {
-      const hours = parseInt(parts[0], 10) || 0;
-      const minutes = parseInt(parts[1], 10) || 0;
-      return hours * 60 + minutes;
-    }
-  }
-
-  // Handle decimal format (Google Sheets stores times as fractions of a day)
-  const decimal = parseFloat(timeStr);
-  if (!isNaN(decimal) && decimal >= 0 && decimal < 1) {
-    return Math.round(decimal * 24 * 60);
-  }
-
-  return 0;
-}
+// parseTimeToMinutes is now imported from '../utils/timeUtils.js'

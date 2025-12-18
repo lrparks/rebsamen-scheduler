@@ -7,7 +7,8 @@ import Input from '../common/Input.jsx';
 import { Textarea } from '../common/Input.jsx';
 import { DateRangePicker } from '../common/DatePicker.jsx';
 import Modal from '../common/Modal.jsx';
-import { formatDateISO, formatDateDisplay, formatTimeDisplay, normalizeTime } from '../../utils/dateHelpers.js';
+import { formatDateISO, formatDateDisplay, formatTimeDisplay } from '../../utils/dateHelpers.js';
+import { parseTimeToMinutes } from '../../utils/timeUtils.js';
 import { useCourts } from '../../hooks/useCourts.js';
 import { useToast } from '../common/Toast.jsx';
 
@@ -48,26 +49,12 @@ export default function ContractorView({ onBookingClick }) {
     });
   }, [bookings, selectedContractor, startDate, endDate]);
 
-  // Safely parse time to minutes
-  const safeParseTimeMinutes = (normalized) => {
-    if (!normalized || typeof normalized !== 'string' || !normalized.includes(':')) {
-      return 0;
-    }
-    const parts = normalized.split(':');
-    if (parts.length < 2) return 0;
-    const hours = parseInt(parts[0], 10) || 0;
-    const minutes = parseInt(parts[1], 10) || 0;
-    return hours * 60 + minutes;
-  };
-
-  // Calculate stats
+  // Calculate stats (using centralized parseTimeToMinutes from timeUtils)
   const stats = useMemo(() => {
     const totalHours = filteredBookings.reduce((sum, b) => {
-      const startNorm = normalizeTime(b.time_start);
-      const endNorm = normalizeTime(b.time_end);
-      if (!startNorm || !endNorm) return sum;
-      const startMinutes = safeParseTimeMinutes(startNorm);
-      const endMinutes = safeParseTimeMinutes(endNorm);
+      const startMinutes = parseTimeToMinutes(b.time_start);
+      const endMinutes = parseTimeToMinutes(b.time_end);
+      if (startMinutes === 0 && endMinutes === 0) return sum;
       const hours = (endMinutes - startMinutes) / 60;
       return sum + hours;
     }, 0);
