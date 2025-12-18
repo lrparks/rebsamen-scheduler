@@ -563,8 +563,8 @@ export default function BookingModal({
     setMode('create');
   };
 
-  // Success screen after creation
-  if (mode === 'create' && createdBookingId) {
+  // Success screen after creation (from create mode or after resolving conflicts)
+  if ((mode === 'create' || mode === 'conflicts') && createdBookingId) {
     return (
       <Modal isOpen={isOpen} onClose={onClose} title="Booking Created" size="sm">
         <div className="text-center space-y-4">
