@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { formatDateISO, formatDateDisplay, addDays, parseDate } from '../../utils/dateHelpers.js';
-import { getWeekStart, getWeekEnd } from '../../utils/reportUtils.js';
+import { getWeekStart, getWeekEnd, getMonthStart } from '../../utils/reportUtils.js';
 import Button, { IconButton } from '../common/Button.jsx';
 import DailyDashboard from '../reports/DailyDashboard.jsx';
 import WeeklySummary from '../reports/WeeklySummary.jsx';
+import MonthlyReport from '../reports/MonthlyReport.jsx';
 
 /**
  * Main Reports View with sub-navigation for different report types
@@ -14,6 +15,9 @@ export default function ReportsView({ onEmptyCellClick }) {
 
   // Week navigation for weekly report
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
+
+  // Month navigation for monthly report
+  const [monthStart, setMonthStart] = useState(() => getMonthStart(new Date()));
 
   const today = formatDateISO(new Date());
   const isToday = selectedDate === today;
@@ -50,6 +54,31 @@ export default function ReportsView({ onEmptyCellClick }) {
 
   const isCurrentWeek = formatDateISO(weekStart) === formatDateISO(getWeekStart(new Date()));
 
+  // Month navigation for monthly report
+  const goToPrevMonth = () => {
+    const newStart = new Date(monthStart);
+    newStart.setMonth(newStart.getMonth() - 1);
+    setMonthStart(newStart);
+  };
+
+  const goToNextMonth = () => {
+    const newStart = new Date(monthStart);
+    newStart.setMonth(newStart.getMonth() + 1);
+    setMonthStart(newStart);
+  };
+
+  const goToThisMonth = () => {
+    setMonthStart(getMonthStart(new Date()));
+  };
+
+  const isCurrentMonth = monthStart.getMonth() === new Date().getMonth() &&
+    monthStart.getFullYear() === new Date().getFullYear();
+
+  // Format month for display
+  const formatMonthDisplay = (date) => {
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  };
+
   // Format week range for display
   const formatWeekRange = (start) => {
     const startDate = new Date(start);
@@ -82,11 +111,12 @@ export default function ReportsView({ onEmptyCellClick }) {
             >
               <option value="daily">Daily Dashboard</option>
               <option value="weekly">Weekly Summary</option>
+              <option value="monthly">Monthly Report</option>
             </select>
           </div>
 
-          {/* Date/Week Navigation */}
-          {reportType === 'daily' ? (
+          {/* Date/Week/Month Navigation */}
+          {reportType === 'daily' && (
             <div className="flex items-center gap-2">
               <IconButton onClick={goToPrevDay} aria-label="Previous day">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -119,7 +149,9 @@ export default function ReportsView({ onEmptyCellClick }) {
                 {formatDateDisplay(selectedDate)}
               </span>
             </div>
-          ) : (
+          )}
+
+          {reportType === 'weekly' && (
             <div className="flex items-center gap-2">
               <IconButton onClick={goToPrevWeek} aria-label="Previous week">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -147,6 +179,34 @@ export default function ReportsView({ onEmptyCellClick }) {
             </div>
           )}
 
+          {reportType === 'monthly' && (
+            <div className="flex items-center gap-2">
+              <IconButton onClick={goToPrevMonth} aria-label="Previous month">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </IconButton>
+
+              <Button
+                variant={isCurrentMonth ? 'primary' : 'outline'}
+                size="sm"
+                onClick={goToThisMonth}
+              >
+                This Month
+              </Button>
+
+              <IconButton onClick={goToNextMonth} aria-label="Next month">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </IconButton>
+
+              <span className="text-sm font-medium text-gray-700">
+                {formatMonthDisplay(monthStart)}
+              </span>
+            </div>
+          )}
+
           {/* Print Button */}
           <Button variant="outline" size="sm" onClick={handlePrint} className="no-print">
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -158,10 +218,14 @@ export default function ReportsView({ onEmptyCellClick }) {
       </div>
 
       {/* Report Content */}
-      {reportType === 'daily' ? (
+      {reportType === 'daily' && (
         <DailyDashboard selectedDate={selectedDate} onEmptyCellClick={onEmptyCellClick} />
-      ) : (
+      )}
+      {reportType === 'weekly' && (
         <WeeklySummary weekStart={weekStart} />
+      )}
+      {reportType === 'monthly' && (
+        <MonthlyReport monthStart={monthStart} />
       )}
     </div>
   );

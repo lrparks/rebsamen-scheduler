@@ -424,4 +424,114 @@ select {
     width: 10px !important;
     height: 10px !important;
   }
+
+  /* ================================
+     Monthly Report Print Styles
+     ================================ */
+
+  /* Monthly report container */
+  .monthly-report {
+    padding: 0 !important;
+  }
+
+  /* Monthly report print header - separate styling */
+  .monthly-report .print-header {
+    display: block !important;
+    text-align: center;
+    padding: 0.25rem 0;
+    border-bottom: 2px solid #000;
+    margin-bottom: 0.5rem;
+  }
+
+  .monthly-report .print-header h1 {
+    font-size: 16pt;
+    margin: 0;
+    font-weight: bold;
+  }
+
+  .monthly-report .print-header h2 {
+    font-size: 12pt;
+    margin: 0.125rem 0;
+    font-weight: 600;
+  }
+
+  .monthly-report .print-header p {
+    font-size: 9pt;
+    margin: 0;
+    color: #666;
+  }
+
+  /* Large metric values */
+  .monthly-report .text-3xl {
+    font-size: 18pt !important;
+    line-height: 1.2 !important;
+  }
+
+  .monthly-report .text-2xl {
+    font-size: 14pt !important;
+    line-height: 1.2 !important;
+  }
+
+  .monthly-report .text-xl {
+    font-size: 12pt !important;
+    line-height: 1.2 !important;
+  }
+
+  /* Three column grid for executive summary */
+  .monthly-report .grid[class*="md:grid-cols-3"] {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 12px !important;
+  }
+
+  /* Contractor table */
+  .monthly-report table {
+    width: 100% !important;
+    font-size: 9pt !important;
+    border-collapse: collapse !important;
+  }
+
+  .monthly-report th,
+  .monthly-report td {
+    padding: 4px 8px !important;
+    border-bottom: 1px solid #e5e7eb !important;
+  }
+
+  .monthly-report tfoot td {
+    border-top: 2px solid #000 !important;
+    font-weight: 600 !important;
+  }
+
+  /* Two-column layout sections */
+  .monthly-report .grid[class*="lg:grid-cols-2"] {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  /* Progress bars */
+  .monthly-report .rounded-full[class*="h-"] {
+    height: 6px !important;
+    background-color: #e5e7eb !important;
+  }
+
+  /* Comparison lines */
+  .monthly-report .space-y-1 {
+    gap: 2px !important;
+  }
+
+  /* Keep cards together */
+  .monthly-report > .bg-white {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Blue color for youth stats */
+  .monthly-report .text-blue-600 {
+    color: #2563eb !important;
+  }
+
+  .monthly-report .bg-blue-500 {
+    background-color: #3b82f6 !important;
+  }
 }

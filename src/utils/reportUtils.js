@@ -924,6 +924,317 @@ export function getParticipationMetrics(bookings, startDate, endDate) {
   };
 }
 
+// ============================================
+// MONTHLY REPORT UTILITIES
+// ============================================
+
+/**
+ * Get first day of month for a date
+ * @param {Date|string} date
+ * @returns {Date}
+ */
+export function getMonthStart(date) {
+  const d = new Date(date);
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
+/**
+ * Get last day of month for a date
+ * @param {Date|string} date
+ * @returns {Date}
+ */
+export function getMonthEnd(date) {
+  const d = new Date(date);
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0);
+}
+
+/**
+ * Get YTD date range (Jan 1 to end of given month)
+ * @param {Date|string} date
+ * @returns {object} { start, end }
+ */
+export function getYTDRange(date) {
+  const d = new Date(date);
+  return {
+    start: formatDateISO(new Date(d.getFullYear(), 0, 1)),
+    end: formatDateISO(getMonthEnd(d)),
+  };
+}
+
+/**
+ * Get total court hours for a date range
+ * @param {Array} bookings
+ * @param {string} startDate
+ * @param {string} endDate
+ * @returns {number}
+ */
+export function getTotalCourtHours(bookings, startDate, endDate) {
+  const rangeBookings = bookings.filter(b =>
+    b.date >= startDate &&
+    b.date <= endDate &&
+    b.status !== BOOKING_STATUS.CANCELLED
+  );
+
+  return rangeBookings.reduce((total, b) => total + getBookingDurationHours(b), 0);
+}
+
+/**
+ * Calculate revenue per court hour
+ * @param {number} revenue
+ * @param {number} hours
+ * @returns {number}
+ */
+export function getRevenuePerCourtHour(revenue, hours) {
+  if (hours === 0) return 0;
+  return Math.round((revenue / hours) * 100) / 100;
+}
+
+/**
+ * Get waived value tracking
+ * @param {Array} bookings
+ * @param {string} startDate
+ * @param {string} endDate
+ * @param {number} defaultHourlyRate - fallback rate if no payment_amount
+ * @returns {object}
+ */
+export function getWaivedValue(bookings, startDate, endDate, defaultHourlyRate = 12) {
+  const waivedBookings = bookings.filter(b =>
+    b.date >= startDate &&
+    b.date <= endDate &&
+    b.status !== BOOKING_STATUS.CANCELLED &&
+    b.payment_status === 'waived'
+  );
+
+  let totalValue = 0;
+  waivedBookings.forEach(b => {
+    // Use payment_amount if set, otherwise estimate from hours
+    if (b.payment_amount && parseFloat(b.payment_amount) > 0) {
+      totalValue += parseFloat(b.payment_amount);
+    } else {
+      totalValue += getBookingDurationHours(b) * defaultHourlyRate;
+    }
+  });
+
+  return {
+    count: waivedBookings.length,
+    value: totalValue,
+    hours: waivedBookings.reduce((sum, b) => sum + getBookingDurationHours(b), 0),
+  };
+}
+
+/**
+ * Get tournament metrics for a date range
+ * @param {Array} bookings
+ * @param {Array} tournaments
+ * @param {string} startDate
+ * @param {string} endDate
+ * @returns {object}
+ */
+export function getTournamentMetrics(bookings, tournaments, startDate, endDate) {
+  // Find tournaments that overlap with date range
+  const rangeTournaments = tournaments.filter(t => {
+    if (t.status === 'cancelled') return false;
+    const tStart = t.start_date;
+    const tEnd = t.end_date || t.start_date;
+    return tStart <= endDate && tEnd >= startDate;
+  });
+
+  // Get tournament bookings in range
+  const tournamentBookings = bookings.filter(b =>
+    b.date >= startDate &&
+    b.date <= endDate &&
+    b.booking_type === BOOKING_TYPES.TOURNAMENT &&
+    b.status !== BOOKING_STATUS.CANCELLED
+  );
+
+  const courtHours = tournamentBookings.reduce((sum, b) => sum + getBookingDurationHours(b), 0);
+
+  // Get unique courts used
+  const courtsUsed = new Set(tournamentBookings.map(b => b.court));
+
+  return {
+    eventsHosted: rangeTournaments.length,
+    tournaments: rangeTournaments,
+    courtHours,
+    courtsUsed: courtsUsed.size,
+    bookingCount: tournamentBookings.length,
+  };
+}
+
+/**
+ * Get monthly comparison (MoM analysis)
+ * @param {Array} bookings
+ * @param {Date} currentMonthStart
+ * @returns {object}
+ */
+export function getMonthlyComparison(bookings, currentMonthStart) {
+  const thisMonthStart = formatDateISO(currentMonthStart);
+  const thisMonthEnd = formatDateISO(getMonthEnd(currentMonthStart));
+
+  const lastMonthDate = new Date(currentMonthStart);
+  lastMonthDate.setMonth(lastMonthDate.getMonth() - 1);
+  const lastMonthStart = formatDateISO(getMonthStart(lastMonthDate));
+  const lastMonthEnd = formatDateISO(getMonthEnd(lastMonthDate));
+
+  // Calculate days in each month for fair comparison
+  const thisMonthDays = new Date(currentMonthStart.getFullYear(), currentMonthStart.getMonth() + 1, 0).getDate();
+  const lastMonthDays = new Date(lastMonthDate.getFullYear(), lastMonthDate.getMonth() + 1, 0).getDate();
+
+  // Total slots per month
+  const thisMonthTotalSlots = getTotalSlotsForDay() * thisMonthDays;
+  const lastMonthTotalSlots = getTotalSlotsForDay() * lastMonthDays;
+  const thisMonthPrimeSlots = getTotalSlotsForPeriod('PRIME') * thisMonthDays;
+  const lastMonthPrimeSlots = getTotalSlotsForPeriod('PRIME') * lastMonthDays;
+
+  // This month bookings
+  const thisMonthBookings = bookings.filter(b =>
+    b.date >= thisMonthStart &&
+    b.date <= thisMonthEnd &&
+    b.status !== BOOKING_STATUS.CANCELLED
+  );
+
+  // Last month bookings
+  const lastMonthBookings = bookings.filter(b =>
+    b.date >= lastMonthStart &&
+    b.date <= lastMonthEnd &&
+    b.status !== BOOKING_STATUS.CANCELLED
+  );
+
+  // Calculate hours
+  const calcHours = (monthBookings) => {
+    let total = 0;
+    let prime = 0;
+    monthBookings.forEach(b => {
+      const hours = getBookingDurationHours(b);
+      total += hours;
+      const startMinutes = parseTimeToMinutes(b.time_start);
+      if (startMinutes >= parseTimeToMinutes('17:00')) {
+        prime += hours;
+      }
+    });
+    return { total, prime };
+  };
+
+  const thisMonthHours = calcHours(thisMonthBookings);
+  const lastMonthHours = calcHours(lastMonthBookings);
+
+  // Revenue
+  const thisMonthRevenue = calculateExpectedRevenue(thisMonthBookings);
+  const lastMonthRevenue = calculateExpectedRevenue(lastMonthBookings);
+
+  return {
+    thisMonth: {
+      hours: thisMonthHours.total,
+      primeHours: thisMonthHours.prime,
+      revenue: thisMonthRevenue,
+      utilization: calculateUtilization(thisMonthHours.total, thisMonthTotalSlots),
+      primeUtilization: calculateUtilization(thisMonthHours.prime, thisMonthPrimeSlots),
+      bookings: thisMonthBookings.length,
+    },
+    lastMonth: {
+      hours: lastMonthHours.total,
+      primeHours: lastMonthHours.prime,
+      revenue: lastMonthRevenue,
+      utilization: calculateUtilization(lastMonthHours.total, lastMonthTotalSlots),
+      primeUtilization: calculateUtilization(lastMonthHours.prime, lastMonthPrimeSlots),
+      bookings: lastMonthBookings.length,
+    },
+    change: {
+      hours: Math.round(thisMonthHours.total - lastMonthHours.total),
+      revenue: thisMonthRevenue - lastMonthRevenue,
+      utilization: calculateUtilization(thisMonthHours.total, thisMonthTotalSlots) -
+        calculateUtilization(lastMonthHours.total, lastMonthTotalSlots),
+      primeUtilization: calculateUtilization(thisMonthHours.prime, thisMonthPrimeSlots) -
+        calculateUtilization(lastMonthHours.prime, lastMonthPrimeSlots),
+    },
+  };
+}
+
+/**
+ * Get YoY comparison for a month
+ * @param {Array} bookings
+ * @param {Date} currentMonthStart
+ * @returns {object}
+ */
+export function getYearOverYearComparison(bookings, currentMonthStart) {
+  const thisMonthStart = formatDateISO(currentMonthStart);
+  const thisMonthEnd = formatDateISO(getMonthEnd(currentMonthStart));
+
+  const lastYearDate = new Date(currentMonthStart);
+  lastYearDate.setFullYear(lastYearDate.getFullYear() - 1);
+  const lastYearMonthStart = formatDateISO(getMonthStart(lastYearDate));
+  const lastYearMonthEnd = formatDateISO(getMonthEnd(lastYearDate));
+
+  // This year bookings
+  const thisYearBookings = bookings.filter(b =>
+    b.date >= thisMonthStart &&
+    b.date <= thisMonthEnd &&
+    b.status !== BOOKING_STATUS.CANCELLED
+  );
+
+  // Last year same month bookings
+  const lastYearBookings = bookings.filter(b =>
+    b.date >= lastYearMonthStart &&
+    b.date <= lastYearMonthEnd &&
+    b.status !== BOOKING_STATUS.CANCELLED
+  );
+
+  const thisYearHours = thisYearBookings.reduce((sum, b) => sum + getBookingDurationHours(b), 0);
+  const lastYearHours = lastYearBookings.reduce((sum, b) => sum + getBookingDurationHours(b), 0);
+  const thisYearRevenue = calculateExpectedRevenue(thisYearBookings);
+  const lastYearRevenue = calculateExpectedRevenue(lastYearBookings);
+
+  return {
+    thisYear: {
+      hours: thisYearHours,
+      revenue: thisYearRevenue,
+      bookings: thisYearBookings.length,
+    },
+    lastYear: {
+      hours: lastYearHours,
+      revenue: lastYearRevenue,
+      bookings: lastYearBookings.length,
+    },
+    change: {
+      hours: Math.round(thisYearHours - lastYearHours),
+      revenue: thisYearRevenue - lastYearRevenue,
+      hoursPercent: lastYearHours > 0 ? Math.round(((thisYearHours - lastYearHours) / lastYearHours) * 100) : 0,
+      revenuePercent: lastYearRevenue > 0 ? Math.round(((thisYearRevenue - lastYearRevenue) / lastYearRevenue) * 100) : 0,
+    },
+    hasLastYearData: lastYearBookings.length > 0,
+  };
+}
+
+/**
+ * Get cancellation breakdown by reason for a date range
+ * @param {Array} bookings
+ * @param {string} startDate
+ * @param {string} endDate
+ * @returns {object}
+ */
+export function getCancellationBreakdown(bookings, startDate, endDate) {
+  const cancelled = bookings.filter(b =>
+    b.date >= startDate &&
+    b.date <= endDate &&
+    b.status === BOOKING_STATUS.CANCELLED
+  );
+
+  const byReason = {
+    weather: cancelled.filter(b => b.cancel_reason === CANCEL_REASONS.WEATHER).length,
+    customer: cancelled.filter(b => b.cancel_reason === CANCEL_REASONS.CUSTOMER).length,
+    facility: cancelled.filter(b => b.cancel_reason === CANCEL_REASONS.FACILITY).length,
+    other: cancelled.filter(b =>
+      !b.cancel_reason ||
+      b.cancel_reason === CANCEL_REASONS.OTHER
+    ).length,
+  };
+
+  return {
+    total: cancelled.length,
+    byReason,
+  };
+}
+
 /**
  * Get utilization stats excluding closed courts
  * @param {Array} bookings
