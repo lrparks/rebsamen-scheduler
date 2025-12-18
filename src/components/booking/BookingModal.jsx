@@ -240,6 +240,7 @@ export default function BookingModal({
 
     // Build all proposed bookings
     const proposedBookings = [];
+    let isFirstBooking = true;
     for (const date of dates) {
       for (const court of courts) {
         proposedBookings.push({
@@ -254,7 +255,8 @@ export default function BookingModal({
           customer_name: formData.customerName,
           customer_phone: formData.customerPhone,
           payment_status: formData.paymentStatus,
-          payment_amount: formData.paymentAmount,
+          // Only put payment on first booking of group to avoid double-counting
+          payment_amount: isFirstBooking ? formData.paymentAmount : '0',
           payment_method: formData.paymentMethod,
           notes: formData.notes,
           participant_count: formData.participantCount || 2,
@@ -263,6 +265,7 @@ export default function BookingModal({
           created_by: initials,
           created_at: new Date().toISOString(),
         });
+        isFirstBooking = false;
       }
     }
 
