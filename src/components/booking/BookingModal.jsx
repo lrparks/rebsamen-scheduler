@@ -112,6 +112,16 @@ export default function BookingModal({
   const { addBookingLocal, updateBookingLocal, refreshBookings, getConflicts, getClosureConflicts } = useBookingsContext();
   const toast = useToast();
 
+  // Debug: Monitor mode changes
+  useEffect(() => {
+    console.log('[BookingModal] Mode changed to:', mode);
+  }, [mode]);
+
+  // Debug: Monitor conflicts changes
+  useEffect(() => {
+    console.log('[BookingModal] Conflicts changed:', conflicts.length, conflicts);
+  }, [conflicts]);
+
   // Determine mode and initialize form data
   useEffect(() => {
     if (isOpen) {
@@ -343,6 +353,9 @@ export default function BookingModal({
 
       const result = await createBooking(payload);
 
+      console.log('[BookingModal] API result:', JSON.stringify(result));
+      console.log('[BookingModal] result.success =', result.success, 'type:', typeof result.success);
+
       if (result.success) {
         // Optimistic update
         bookingsToCreate.forEach(b => addBookingLocal(b));
@@ -358,13 +371,26 @@ export default function BookingModal({
       } else {
         // Check if it's a server-side conflict error
         const errorMsg = result.error || 'Failed to create booking';
-        if (errorMsg.includes('Conflict detected')) {
+        console.log('[BookingModal] Error message:', errorMsg);
+        // Check for conflict message (case insensitive)
+        const isConflict = typeof errorMsg === 'string' &&
+          (errorMsg.includes('Conflict detected') ||
+           errorMsg.toLowerCase().includes('conflict') ||
+           errorMsg.includes('already booked'));
+        console.log('[BookingModal] Is conflict error?', isConflict);
+
+        if (isConflict) {
+          console.log('[BookingModal] >>> CONFLICT DETECTED - SHOWING MODAL <<<');
           // Parse conflict info and show modal
           const conflictInfo = parseServerConflictError(errorMsg, bookingsToCreate);
+          console.log('[BookingModal] Parsed conflict info:', conflictInfo);
           setConflicts(conflictInfo);
           setPendingBookings(bookingsToCreate);
           setMode('conflicts');
+          console.log('[BookingModal] Mode set to conflicts, returning');
+          return; // Ensure we don't continue
         } else {
+          console.log('[BookingModal] Not a conflict error, showing toast');
           toast.error(errorMsg);
         }
       }
@@ -571,6 +597,9 @@ export default function BookingModal({
   const isExistingBooking = !!booking;
   const isActive = booking?.status === 'active';
   const showNoShowButton = isActive && canMarkNoShow(booking);
+
+  // Debug: Log render state
+  console.log('[BookingModal] Rendering with mode:', mode, 'conflicts:', conflicts.length, 'pendingBookings:', pendingBookings.length);
 
   return (
     <>
