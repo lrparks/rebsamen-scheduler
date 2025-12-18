@@ -11,6 +11,7 @@ import ContractorView from './components/views/ContractorView.jsx';
 import TeamsView from './components/views/TeamsView.jsx';
 import TournamentsView from './components/views/TournamentsView.jsx';
 import SearchView from './components/views/SearchView.jsx';
+import ReportsView from './components/views/ReportsView.jsx';
 import MaintenanceView from './components/views/MaintenanceView.jsx';
 import ClosuresView from './components/views/ClosuresView.jsx';
 import BookingModal from './components/booking/BookingModal.jsx';
@@ -200,6 +201,9 @@ function AppContent() {
 
       case 'search':
         return <SearchView onBookingClick={handleBookingClick} />;
+
+      case 'reports':
+        return <ReportsView />;
 
       case 'maintenance':
         return <MaintenanceView />;

@@ -19,6 +19,7 @@ export default function Navigation({
     { id: 'tournaments', label: 'Tournaments' },
     { id: 'closures', label: 'Closures' },
     { id: 'search', label: 'Search' },
+    { id: 'reports', label: 'Reports' },
     { id: 'maintenance', label: 'Maintenance' },
   ];
 
