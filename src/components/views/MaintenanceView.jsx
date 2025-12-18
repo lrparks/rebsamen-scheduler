@@ -52,6 +52,9 @@ export default function MaintenanceView() {
   const [historyWeekStart, setHistoryWeekStart] = useState(() => getWeekStart(new Date()));
   const [showFollowUpOnly, setShowFollowUpOnly] = useState(false);
 
+  // Scheduled tasks filter: 'all', 'weekly', 'monthly'
+  const [scheduledTasksFilter, setScheduledTasksFilter] = useState('weekly');
+
   const today = formatDateISO(new Date());
   const selectedDateStr = formatDateISO(selectedDate);
   const selectedDayOfWeek = selectedDate.getDay(); // 0=Sun, 6=Sat
@@ -227,6 +230,42 @@ export default function MaintenanceView() {
     return formatDateISO(historyWeekStart) === formatDateISO(currentWeekStart);
   }, [historyWeekStart]);
 
+  // Print just the maintenance history
+  const handlePrintHistory = useCallback(() => {
+    const printContent = document.getElementById('maintenance-history-print');
+    if (!printContent) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow popups to print the maintenance history');
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Maintenance History - ${formatWeekRange(historyWeekStart)}</title>
+          <style>
+            body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; }
+            h1 { font-size: 18px; margin-bottom: 10px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 12px; }
+            th { background: #f5f5f5; font-weight: 600; }
+            .follow-up { background: #fef3c7; }
+            .follow-up-badge { background: #fde68a; padding: 2px 6px; border-radius: 4px; font-size: 10px; }
+          </style>
+        </head>
+        <body>
+          <h1>Maintenance History - Week of ${formatWeekRange(historyWeekStart)}</h1>
+          ${printContent.innerHTML}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  }, [historyWeekStart]);
+
   // Recent maintenance history with week and follow-up filters
   const recentHistory = useMemo(() => {
     const weekEnd = new Date(historyWeekStart);
@@ -364,14 +403,25 @@ export default function MaintenanceView() {
           </div>
         </div>
 
-        {/* Upcoming Tasks */}
+        {/* Recurring Scheduled Tasks */}
         <div className="bg-white rounded-lg border border-gray-200">
           <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-            <h3 className="font-medium text-gray-900">Scheduled Tasks</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium text-gray-900">Recurring Scheduled Tasks</h3>
+              <select
+                value={scheduledTasksFilter}
+                onChange={(e) => setScheduledTasksFilter(e.target.value)}
+                className="text-sm border border-gray-300 rounded px-2 py-1 bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              >
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="all">All</option>
+              </select>
+            </div>
           </div>
           <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
             {/* Weekly Tasks */}
-            {weeklyTasks.length > 0 && (
+            {(scheduledTasksFilter === 'all' || scheduledTasksFilter === 'weekly') && weeklyTasks.length > 0 && (
               <>
                 <div className="px-4 py-2 bg-blue-50 text-sm font-medium text-blue-800 sticky top-0">
                   Weekly Schedule
@@ -391,7 +441,7 @@ export default function MaintenanceView() {
             )}
 
             {/* Monthly Tasks */}
-            {monthlyTasks.length > 0 && (
+            {(scheduledTasksFilter === 'all' || scheduledTasksFilter === 'monthly') && monthlyTasks.length > 0 && (
               <>
                 <div className="px-4 py-2 bg-purple-50 text-sm font-medium text-purple-800 sticky top-0">
                   Monthly Schedule
@@ -410,7 +460,18 @@ export default function MaintenanceView() {
               </>
             )}
 
-            {weeklyTasks.length === 0 && monthlyTasks.length === 0 && (
+            {/* Empty state for current filter */}
+            {scheduledTasksFilter === 'weekly' && weeklyTasks.length === 0 && (
+              <div className="px-4 py-8 text-center text-gray-500">
+                No weekly tasks configured
+              </div>
+            )}
+            {scheduledTasksFilter === 'monthly' && monthlyTasks.length === 0 && (
+              <div className="px-4 py-8 text-center text-gray-500">
+                No monthly tasks configured
+              </div>
+            )}
+            {scheduledTasksFilter === 'all' && weeklyTasks.length === 0 && monthlyTasks.length === 0 && (
               <div className="px-4 py-8 text-center text-gray-500">
                 No scheduled tasks configured
               </div>
@@ -449,7 +510,7 @@ export default function MaintenanceView() {
               </IconButton>
             </div>
 
-            {/* Follow-up filter */}
+            {/* Follow-up filter and Print button (left aligned) */}
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -460,10 +521,17 @@ export default function MaintenanceView() {
               <span className="text-sm text-gray-700">Needs Follow-up Only</span>
             </label>
 
+            <Button variant="outline" size="sm" onClick={handlePrintHistory}>
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              Print
+            </Button>
+
             <span className="text-sm text-gray-500 ml-auto">({recentHistory.length})</span>
           </div>
         </div>
-        <div className="overflow-x-auto">
+        <div id="maintenance-history-print" className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
