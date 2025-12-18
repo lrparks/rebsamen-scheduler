@@ -198,16 +198,24 @@ export default function BookingModal({
     }
 
     // Validate time values
+    console.log('[BookingModal] formData.timeStart:', formData.timeStart, 'type:', typeof formData.timeStart);
+    console.log('[BookingModal] formData.timeEnd:', formData.timeEnd, 'type:', typeof formData.timeEnd);
+
     const normalizedTimeStart = normalizeTime(formData.timeStart);
     const normalizedTimeEnd = normalizeTime(formData.timeEnd);
 
+    console.log('[BookingModal] normalizedTimeStart:', normalizedTimeStart);
+    console.log('[BookingModal] normalizedTimeEnd:', normalizedTimeEnd);
+
     if (!normalizedTimeStart || !normalizedTimeStart.includes(':')) {
       toast.error('Please select a valid start time');
+      console.error('[BookingModal] Invalid start time:', formData.timeStart, '→', normalizedTimeStart);
       return;
     }
 
     if (!normalizedTimeEnd || !normalizedTimeEnd.includes(':')) {
       toast.error('Please select a valid end time');
+      console.error('[BookingModal] Invalid end time:', formData.timeEnd, '→', normalizedTimeEnd);
       return;
     }
 
@@ -302,6 +310,12 @@ export default function BookingModal({
   const createBookings = async (bookingsToCreate) => {
     setLoading(true);
     try {
+      // Log what we're sending to the API
+      console.log('[BookingModal] Creating bookings:', JSON.stringify(bookingsToCreate, null, 2));
+      bookingsToCreate.forEach((b, i) => {
+        console.log(`[BookingModal] Booking ${i}: time_start="${b.time_start}" (${typeof b.time_start}), time_end="${b.time_end}" (${typeof b.time_end})`);
+      });
+
       const result = await createBooking(bookingsToCreate.length === 1 ? bookingsToCreate[0] : bookingsToCreate);
 
       if (result.success) {
@@ -357,13 +371,27 @@ export default function BookingModal({
       return;
     }
 
+    // Normalize time values before sending to API
+    const normalizedTimeStart = normalizeTime(formData.timeStart);
+    const normalizedTimeEnd = normalizeTime(formData.timeEnd);
+
+    if (!normalizedTimeStart || !normalizedTimeStart.includes(':')) {
+      toast.error('Please select a valid start time');
+      return;
+    }
+
+    if (!normalizedTimeEnd || !normalizedTimeEnd.includes(':')) {
+      toast.error('Please select a valid end time');
+      return;
+    }
+
     setLoading(true);
     try {
       const updates = {
         date: formData.date,
         court: formData.court,
-        time_start: formData.timeStart,
-        time_end: formData.timeEnd,
+        time_start: normalizedTimeStart,
+        time_end: normalizedTimeEnd,
         booking_type: formData.bookingType,
         entity_id: formData.entityId || '',
         customer_name: formData.customerName,
@@ -374,6 +402,8 @@ export default function BookingModal({
         notes: formData.notes,
         modified_at: new Date().toISOString(),
       };
+
+      console.log('[BookingModal] Sending update:', updates);
 
       const result = await updateBooking(booking.booking_id, updates);
 

@@ -11,14 +11,17 @@ import { fetchCSV } from './csvParser.js';
  */
 export async function callAppsScript(action, data) {
   try {
+    const payload = { action, ...data };
+    console.log(`[API] Sending ${action}:`, JSON.stringify(payload, null, 2));
+
     const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action, ...data }),
+      body: JSON.stringify(payload),
     });
 
     const result = await response.json();
-    console.log(`[API] ${action}:`, result);
+    console.log(`[API] ${action} response:`, result);
     return result;
   } catch (error) {
     console.error(`[API] ${action} error:`, error);
