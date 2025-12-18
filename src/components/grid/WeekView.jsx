@@ -47,10 +47,11 @@ export default function WeekView({
     })
   );
 
-  // Get bookings for selected court across the week
+  // Get bookings for selected court across the week - supports overlapping bookings
   const weekBookings = useMemo(() => {
     const map = new Map();
 
+    // First pass: collect all bookings per slot
     weekDays.forEach((day) => {
       const dateStr = formatDateISO(day);
       const dayBookings = getBookingsForDateAndCourt(dateStr, selectedCourt);
@@ -64,16 +65,30 @@ export default function WeekView({
         const endIndex = timeSlots.indexOf(endTime);
         const slotsSpanned = endIndex > startIndex ? endIndex - startIndex : 1;
 
-        const key = `${dateStr}-${startTime}`;
-        map.set(key, { booking, isFirstSlot: true, slotsSpanned });
-
-        for (let i = 1; i < slotsSpanned; i++) {
+        // Add to each slot this booking occupies
+        for (let i = 0; i < slotsSpanned; i++) {
           const slotTime = timeSlots[startIndex + i];
           if (slotTime) {
-            const occupiedKey = `${dateStr}-${slotTime}`;
-            map.set(occupiedKey, { booking, isFirstSlot: false, slotsSpanned: 0 });
+            const key = `${dateStr}-${slotTime}`;
+            if (!map.has(key)) {
+              map.set(key, []);
+            }
+            map.get(key).push({
+              booking,
+              isFirstSlot: i === 0,
+              slotsSpanned: i === 0 ? slotsSpanned : 0,
+            });
           }
         }
+      });
+    });
+
+    // Second pass: calculate overlap positions for each slot
+    map.forEach((bookingsInSlot, key) => {
+      const count = bookingsInSlot.length;
+      bookingsInSlot.forEach((item, index) => {
+        item.overlapCount = count;
+        item.overlapIndex = index;
       });
     });
 
@@ -318,7 +333,7 @@ export default function WeekView({
               {weekDays.map((day, dayIndex) => {
                 const dateStr = formatDateISO(day);
                 const key = `${dateStr}-${time}`;
-                const cellData = weekBookings.get(key);
+                const cellDataArray = weekBookings.get(key);
                 const isSelected = isCellSelected(dayIndex, timeIndex);
 
                 return (
@@ -329,13 +344,19 @@ export default function WeekView({
                       ${isToday(day) ? 'bg-green-50' : ''}
                     `}
                   >
-                    {cellData ? (
-                      <BookingCell
-                        booking={cellData.booking}
-                        onClick={onBookingClick}
-                        isFirstSlot={cellData.isFirstSlot}
-                        slotsSpanned={cellData.slotsSpanned}
-                      />
+                    {cellDataArray && cellDataArray.length > 0 ? (
+                      // Render all overlapping bookings
+                      cellDataArray.map((cellData, idx) => (
+                        <BookingCell
+                          key={cellData.booking.booking_id}
+                          booking={cellData.booking}
+                          onClick={onBookingClick}
+                          isFirstSlot={cellData.isFirstSlot}
+                          slotsSpanned={cellData.slotsSpanned}
+                          overlapCount={cellData.overlapCount}
+                          overlapIndex={cellData.overlapIndex}
+                        />
+                      ))
                     ) : (
                       <EmptyCell
                         dayIndex={dayIndex}
