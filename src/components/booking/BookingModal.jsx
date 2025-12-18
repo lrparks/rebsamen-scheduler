@@ -158,10 +158,15 @@ export default function BookingModal({
 
   const getDefaultEndTime = (startTime) => {
     const normalized = normalizeTime(startTime);
-    if (!normalized || !normalized.includes(':')) {
+    if (!normalized || typeof normalized !== 'string' || !normalized.includes(':')) {
       return '10:30'; // Default fallback
     }
-    const [hour, minute] = normalized.split(':').map(Number);
+    const parts = normalized.split(':');
+    if (parts.length < 2) {
+      return '10:30'; // Default fallback
+    }
+    const hour = parseInt(parts[0], 10) || 0;
+    const minute = parseInt(parts[1], 10) || 0;
     let endHour = hour + 1;
     let endMinute = minute + 30;
     if (endMinute >= 60) {
@@ -192,6 +197,20 @@ export default function BookingModal({
       return;
     }
 
+    // Validate time values
+    const normalizedTimeStart = normalizeTime(formData.timeStart);
+    const normalizedTimeEnd = normalizeTime(formData.timeEnd);
+
+    if (!normalizedTimeStart || !normalizedTimeStart.includes(':')) {
+      toast.error('Please select a valid start time');
+      return;
+    }
+
+    if (!normalizedTimeEnd || !normalizedTimeEnd.includes(':')) {
+      toast.error('Please select a valid end time');
+      return;
+    }
+
     // Get all dates - handle recurring bookings
     let dates = formData.dates || [formData.date];
     if (formData.recurring && formData.recurringWeeks > 1) {
@@ -206,12 +225,12 @@ export default function BookingModal({
     for (const date of dates) {
       for (const court of courts) {
         proposedBookings.push({
-          booking_id: generateBookingId(date, court, formData.timeStart),
+          booking_id: generateBookingId(date, court, normalizedTimeStart),
           group_id: groupId,
           date: date,
           court: court,
-          time_start: formData.timeStart,
-          time_end: formData.timeEnd,
+          time_start: normalizedTimeStart,
+          time_end: normalizedTimeEnd,
           booking_type: formData.bookingType,
           entity_id: formData.entityId || '',
           customer_name: formData.customerName,
@@ -229,44 +248,50 @@ export default function BookingModal({
 
     // Check for conflicts unless skipped
     if (!skipConflictCheck) {
-      const allConflicts = [];
-      for (const booking of proposedBookings) {
-        // Check booking conflicts
-        const bookingConflicts = getConflicts(
-          booking.date,
-          booking.court,
-          booking.time_start,
-          booking.time_end
-        );
-        allConflicts.push(...bookingConflicts);
+      try {
+        const allConflicts = [];
+        for (const booking of proposedBookings) {
+          // Check booking conflicts
+          const bookingConflicts = getConflicts(
+            booking.date,
+            booking.court,
+            booking.time_start,
+            booking.time_end
+          );
+          allConflicts.push(...bookingConflicts);
 
-        // Check closure conflicts
-        const closureConflicts = getClosureConflicts(
-          booking.date,
-          booking.court,
-          booking.time_start,
-          booking.time_end
-        );
-        // Add closure info as pseudo-bookings for display
-        closureConflicts.forEach(closure => {
-          allConflicts.push({
-            booking_id: `CLOSURE-${closure.date}-${closure.court}`,
-            date: closure.date,
-            court: closure.court === 'all' ? 'All Courts' : closure.court,
-            time_start: closure.time_start || '00:00',
-            time_end: closure.time_end || '21:00',
-            customer_name: `CLOSED: ${closure.reason || 'Court Closure'}`,
-            booking_type: 'closure',
+          // Check closure conflicts
+          const closureConflicts = getClosureConflicts(
+            booking.date,
+            booking.court,
+            booking.time_start,
+            booking.time_end
+          );
+          // Add closure info as pseudo-bookings for display
+          closureConflicts.forEach(closure => {
+            allConflicts.push({
+              booking_id: `CLOSURE-${closure.date}-${closure.court}`,
+              date: closure.date,
+              court: closure.court === 'all' ? 'All Courts' : closure.court,
+              time_start: closure.time_start || '00:00',
+              time_end: closure.time_end || '21:00',
+              customer_name: `CLOSED: ${closure.reason || 'Court Closure'}`,
+              booking_type: 'closure',
+            });
           });
-        });
-      }
+        }
 
-      if (allConflicts.length > 0) {
-        // Show conflict warning
-        setConflicts(allConflicts);
-        setPendingBookings(proposedBookings);
-        setMode('conflicts');
-        return;
+        if (allConflicts.length > 0) {
+          // Show conflict warning
+          setConflicts(allConflicts);
+          setPendingBookings(proposedBookings);
+          setMode('conflicts');
+          return;
+        }
+      } catch (error) {
+        console.error('[BookingModal] Conflict check error:', error);
+        toast.error('Error checking for conflicts. Creating booking without conflict check.');
+        // Continue with booking creation despite conflict check error
       }
     }
 

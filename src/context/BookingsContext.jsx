@@ -263,15 +263,31 @@ export function useBookingsContext() {
  * @returns {number}
  */
 function parseTimeToMinutes(time) {
-  if (!time) return 0;
+  if (!time && time !== 0) return 0;
 
-  // Convert to string if not already
-  const timeStr = String(time).trim();
+  // Ensure we have a string
+  let timeStr;
+  try {
+    timeStr = String(time).trim();
+  } catch (e) {
+    console.error('[parseTimeToMinutes] Error converting time to string:', time, e);
+    return 0;
+  }
+
+  // Safety check - ensure timeStr is actually a string with split method
+  if (typeof timeStr !== 'string' || typeof timeStr.split !== 'function') {
+    console.error('[parseTimeToMinutes] timeStr is not a valid string:', timeStr, typeof timeStr);
+    return 0;
+  }
 
   // If it's already HH:MM format
   if (timeStr.includes(':')) {
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    return hours * 60 + (minutes || 0);
+    const parts = timeStr.split(':');
+    if (parts.length >= 2) {
+      const hours = parseInt(parts[0], 10) || 0;
+      const minutes = parseInt(parts[1], 10) || 0;
+      return hours * 60 + minutes;
+    }
   }
 
   // Handle decimal format (Google Sheets stores times as fractions of a day)

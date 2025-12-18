@@ -2,6 +2,19 @@ import { BOOKING_TYPES } from '../config.js';
 import { normalizeTime } from './dateHelpers.js';
 
 /**
+ * Safely parse hour from time string
+ * @param {string} normalized - Normalized time string (HH:MM)
+ * @returns {number} Hour or 0 if invalid
+ */
+function safeParseHour(normalized) {
+  if (!normalized || typeof normalized !== 'string' || !normalized.includes(':')) {
+    return 0;
+  }
+  const parts = normalized.split(':');
+  return parts.length >= 1 ? (parseInt(parts[0], 10) || 0) : 0;
+}
+
+/**
  * Determine if a time slot is prime time
  * Prime: M-F 5pm-9pm, Sat-Sun all day
  * @param {Date|string} date - Booking date
@@ -9,11 +22,11 @@ import { normalizeTime } from './dateHelpers.js';
  * @returns {boolean}
  */
 export function isPrimeTime(date, timeStart) {
-  if (!date || !timeStart) return false;
+  if (!date || (!timeStart && timeStart !== 0)) return false;
   const d = new Date(date);
   const dayOfWeek = d.getDay(); // 0=Sun, 6=Sat
   const normalized = normalizeTime(timeStart);
-  const hour = normalized ? parseInt(normalized.split(':')[0], 10) : 0;
+  const hour = safeParseHour(normalized);
 
   // Weekend (Sat=6, Sun=0) = all prime
   if (dayOfWeek === 0 || dayOfWeek === 6) {
@@ -62,6 +75,22 @@ export function getRateDescription(date, timeStart) {
 }
 
 /**
+ * Safely parse time string to minutes
+ * @param {string} normalized - Normalized time string (HH:MM)
+ * @returns {number} Minutes since midnight or 0 if invalid
+ */
+function safeParseMinutes(normalized) {
+  if (!normalized || typeof normalized !== 'string' || !normalized.includes(':')) {
+    return 0;
+  }
+  const parts = normalized.split(':');
+  if (parts.length < 2) return 0;
+  const hours = parseInt(parts[0], 10) || 0;
+  const minutes = parseInt(parts[1], 10) || 0;
+  return hours * 60 + minutes;
+}
+
+/**
  * Calculate total for multiple time slots
  * @param {Date|string} date
  * @param {string|number} timeStart
@@ -79,11 +108,8 @@ export function calculateTotalRate(date, timeStart, timeEnd, bookingType, courts
 
   if (!normalizedStart || !normalizedEnd) return baseRate * courts;
 
-  const [startHour, startMin] = normalizedStart.split(':').map(Number);
-  const [endHour, endMin] = normalizedEnd.split(':').map(Number);
-
-  const startMinutes = startHour * 60 + startMin;
-  const endMinutes = endHour * 60 + endMin;
+  const startMinutes = safeParseMinutes(normalizedStart);
+  const endMinutes = safeParseMinutes(normalizedEnd);
   const durationSlots = (endMinutes - startMinutes) / 30;
 
   // First 1.5 hours (3 slots) is base rate, then additional time

@@ -4,12 +4,21 @@ import { CONFIG } from '../config.js';
  * Normalize time to HH:MM format
  * Handles: HH:MM, H:MM, decimal (0.375), 12-hour AM/PM
  * @param {string|number} time
- * @returns {string} Time in HH:MM format
+ * @returns {string} Time in HH:MM format (empty string if invalid)
  */
 export function normalizeTime(time) {
-  if (!time) return '';
+  if (!time && time !== 0) return '';
 
-  const str = String(time).trim();
+  // Ensure we have a string
+  let str;
+  try {
+    str = String(time).trim();
+  } catch (e) {
+    console.error('[normalizeTime] Error converting time to string:', time, e);
+    return '';
+  }
+
+  if (!str || typeof str !== 'string') return '';
 
   // Already in HH:MM or H:MM format
   const timeMatch = str.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
@@ -37,7 +46,9 @@ export function normalizeTime(time) {
     return `${h.toString().padStart(2, '0')}:${minutes}`;
   }
 
-  return str;
+  // Return original string if it looks like a time, otherwise empty
+  if (str.includes(':')) return str;
+  return '';
 }
 
 /**
@@ -47,11 +58,16 @@ export function normalizeTime(time) {
  */
 function parseTime(time) {
   const normalized = normalizeTime(time);
-  if (!normalized || !normalized.includes(':')) {
+  if (!normalized || typeof normalized !== 'string' || !normalized.includes(':')) {
     return { hours: 0, minutes: 0 };
   }
-  const [hours, minutes] = normalized.split(':').map(Number);
-  return { hours: hours || 0, minutes: minutes || 0 };
+  const parts = normalized.split(':');
+  if (parts.length < 2) {
+    return { hours: 0, minutes: 0 };
+  }
+  const hours = parseInt(parts[0], 10) || 0;
+  const minutes = parseInt(parts[1], 10) || 0;
+  return { hours, minutes };
 }
 
 /**

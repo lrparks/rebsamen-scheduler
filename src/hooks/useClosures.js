@@ -125,9 +125,12 @@ export function useClosures() {
  * @returns {number}
  */
 function parseTimeToMinutes(time) {
-  if (!time) return 0;
+  if (!time && time !== 0) return 0;
   const normalized = normalizeTime(time);
-  if (!normalized || !normalized.includes(':')) return 0;
-  const [hours, minutes] = normalized.split(':').map(Number);
-  return hours * 60 + (minutes || 0);
+  if (!normalized || typeof normalized !== 'string' || !normalized.includes(':')) return 0;
+  const parts = normalized.split(':');
+  if (parts.length < 2) return 0;
+  const hours = parseInt(parts[0], 10) || 0;
+  const minutes = parseInt(parts[1], 10) || 0;
+  return hours * 60 + minutes;
 }
