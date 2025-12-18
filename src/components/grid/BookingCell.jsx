@@ -36,7 +36,7 @@ export default function BookingCell({
     <button
       onClick={() => onClick(booking)}
       className={`
-        absolute overflow-hidden rounded
+        absolute overflow-hidden rounded z-10
         text-left cursor-pointer transition-all
         hover:shadow-md hover:z-20
         ${colorClasses}
