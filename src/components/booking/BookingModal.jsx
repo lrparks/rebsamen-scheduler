@@ -32,6 +32,9 @@ function generateRecurringDates(startDate, weeks) {
  * Conflict Warning Component
  */
 function ConflictWarning({ conflicts, onProceed, onCancel }) {
+  // Check if this is a server-detected conflict
+  const isServerConflict = conflicts.some(c => c.booking_id === 'SERVER-CONFLICT');
+
   return (
     <div className="space-y-4">
       <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
@@ -40,9 +43,12 @@ function ConflictWarning({ conflicts, onProceed, onCancel }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
           <div>
-            <h4 className="font-medium text-amber-800">Booking Conflicts Detected</h4>
+            <h4 className="font-medium text-amber-800">Booking Conflict Detected</h4>
             <p className="text-sm text-amber-700 mt-1">
-              {conflicts.length} slot{conflicts.length > 1 ? 's' : ''} already {conflicts.length > 1 ? 'have' : 'has'} existing bookings:
+              {isServerConflict
+                ? 'This time slot already has an existing booking.'
+                : `${conflicts.length} slot${conflicts.length > 1 ? 's' : ''} already ${conflicts.length > 1 ? 'have' : 'has'} existing bookings:`
+              }
             </p>
           </div>
         </div>
@@ -57,19 +63,27 @@ function ConflictWarning({ conflicts, onProceed, onCancel }) {
             <div className="text-gray-600">
               {formatTimeDisplay(conflict.time_start)} - {formatTimeDisplay(conflict.time_end)}
             </div>
-            <div className="text-gray-500">
-              {conflict.customer_name || conflict.booking_type} ({conflict.booking_id})
-            </div>
+            {conflict.booking_id !== 'SERVER-CONFLICT' && (
+              <div className="text-gray-500">
+                {conflict.customer_name || conflict.booking_type} ({conflict.booking_id})
+              </div>
+            )}
           </div>
         ))}
       </div>
 
+      <p className="text-sm text-gray-600">
+        {isServerConflict
+          ? 'You can adjust the time/court, or book anyway if you plan to modify the existing reservation.'
+          : 'Choose to go back and adjust, or create the booking anyway (skipping conflicting slots).'}
+      </p>
+
       <div className="flex gap-3 pt-2">
         <Button variant="secondary" onClick={onCancel} fullWidth>
-          Go Back & Fix
+          Adjust Time
         </Button>
         <Button variant="warning" onClick={onProceed} fullWidth>
-          Create Anyway (Skip Conflicts)
+          Book Anyway
         </Button>
       </div>
     </div>
@@ -307,7 +321,7 @@ export default function BookingModal({
     await createBookings(proposedBookings);
   };
 
-  const createBookings = async (bookingsToCreate) => {
+  const createBookings = async (bookingsToCreate, forceCreate = false) => {
     setLoading(true);
     try {
       // Log what we're sending to the API
@@ -316,7 +330,18 @@ export default function BookingModal({
         console.log(`[BookingModal] Booking ${i}: time_start="${b.time_start}" (${typeof b.time_start}), time_end="${b.time_end}" (${typeof b.time_end})`);
       });
 
-      const result = await createBooking(bookingsToCreate.length === 1 ? bookingsToCreate[0] : bookingsToCreate);
+      // Add forceCreate flag if user wants to override conflict check
+      const payload = bookingsToCreate.length === 1 ? bookingsToCreate[0] : bookingsToCreate;
+      if (forceCreate) {
+        // If single booking, add flag to it; if array, add to first one
+        if (Array.isArray(payload)) {
+          payload[0].forceCreate = true;
+        } else {
+          payload.forceCreate = true;
+        }
+      }
+
+      const result = await createBooking(payload);
 
       if (result.success) {
         // Optimistic update
@@ -331,7 +356,17 @@ export default function BookingModal({
         // Refresh data
         setTimeout(() => refreshBookings(), 1000);
       } else {
-        toast.error(result.error || 'Failed to create booking');
+        // Check if it's a server-side conflict error
+        const errorMsg = result.error || 'Failed to create booking';
+        if (errorMsg.includes('Conflict detected')) {
+          // Parse conflict info and show modal
+          const conflictInfo = parseServerConflictError(errorMsg, bookingsToCreate);
+          setConflicts(conflictInfo);
+          setPendingBookings(bookingsToCreate);
+          setMode('conflicts');
+        } else {
+          toast.error(errorMsg);
+        }
       }
     } catch (error) {
       console.error('[BookingModal] Create error:', error);
@@ -341,22 +376,61 @@ export default function BookingModal({
     }
   };
 
-  const handleProceedWithConflicts = async () => {
-    // Filter out bookings that have conflicts
-    const conflictKeys = new Set(
-      conflicts.map(c => `${c.date}-${c.court}`)
-    );
-    const nonConflictingBookings = pendingBookings.filter(
-      b => !conflictKeys.has(`${b.date}-${b.court}`)
-    );
-
-    if (nonConflictingBookings.length === 0) {
-      toast.error('All selected slots have conflicts');
-      setMode('create');
-      return;
+  // Parse server conflict error into a format for the ConflictWarning component
+  const parseServerConflictError = (errorMsg, bookings) => {
+    // Error format: "Conflict detected for Court X at HH:MM"
+    const match = errorMsg.match(/Court (\d+|Stadium) at (\d{2}:\d{2})/);
+    if (match) {
+      const court = match[1] === 'Stadium' ? 17 : parseInt(match[1], 10);
+      const time = match[2];
+      const booking = bookings.find(b => b.court === court) || bookings[0];
+      return [{
+        booking_id: 'SERVER-CONFLICT',
+        date: booking.date,
+        court: court,
+        time_start: time,
+        time_end: booking.time_end,
+        customer_name: 'Existing Booking',
+        booking_type: 'unknown',
+      }];
     }
+    // Fallback: create generic conflict from first booking
+    return [{
+      booking_id: 'SERVER-CONFLICT',
+      date: bookings[0].date,
+      court: bookings[0].court,
+      time_start: bookings[0].time_start,
+      time_end: bookings[0].time_end,
+      customer_name: 'Existing Booking (server detected)',
+      booking_type: 'unknown',
+    }];
+  };
 
-    await createBookings(nonConflictingBookings);
+  const handleProceedWithConflicts = async () => {
+    // Check if this is a server-detected conflict (we need to force-create)
+    const isServerConflict = conflicts.some(c => c.booking_id === 'SERVER-CONFLICT');
+
+    if (isServerConflict) {
+      // Server detected conflict - try to force create
+      // Note: This requires Apps Script to support forceCreate parameter
+      await createBookings(pendingBookings, true);
+    } else {
+      // Client-side conflict - filter out conflicting bookings
+      const conflictKeys = new Set(
+        conflicts.map(c => `${c.date}-${c.court}`)
+      );
+      const nonConflictingBookings = pendingBookings.filter(
+        b => !conflictKeys.has(`${b.date}-${b.court}`)
+      );
+
+      if (nonConflictingBookings.length === 0) {
+        toast.error('All selected slots have conflicts. Adjust time or court to continue.');
+        setMode('create');
+        return;
+      }
+
+      await createBookings(nonConflictingBookings);
+    }
   };
 
   const handleCancelConflicts = () => {
