@@ -62,6 +62,7 @@ export function getRateDescription(date, timeStart) {
 
 /**
  * Calculate total for multiple time slots with mixed prime/non-prime rates
+ * Supports half-hour increments
  * @param {Date|string} date
  * @param {string|number} timeStart - HH:MM format
  * @param {string|number} timeEnd - HH:MM format
@@ -84,21 +85,22 @@ export function calculateTotalRate(date, timeStart, timeEnd, bookingType, courts
     return baseRate * courts;
   }
 
-  // Calculate each hour's rate separately to handle prime/non-prime transitions
+  // Calculate each half-hour's rate separately to handle prime/non-prime transitions
   let totalRate = 0;
   const d = new Date(date);
   const dayOfWeek = d.getDay(); // 0=Sun, 6=Sat
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-  // Iterate through each hour of the booking
-  for (let mins = startMinutes; mins < endMinutes; mins += 60) {
+  // Iterate through each 30-minute slot of the booking
+  for (let mins = startMinutes; mins < endMinutes; mins += 30) {
     const hour = Math.floor(mins / 60);
 
     // Weekend = all prime, Weekday = 17:00+ is prime
     const isPrime = isWeekend || hour >= 17;
-    const hourlyRate = isPrime ? 12.00 : 10.00;
+    // Half-hour rate is half the hourly rate
+    const halfHourRate = isPrime ? 6.00 : 5.00;
 
-    totalRate += hourlyRate;
+    totalRate += halfHourRate;
   }
 
   return totalRate * courts;
@@ -106,6 +108,7 @@ export function calculateTotalRate(date, timeStart, timeEnd, bookingType, courts
 
 /**
  * Get detailed rate breakdown for display
+ * Supports half-hour increments
  * @param {Date|string} date
  * @param {string} timeStart - HH:MM
  * @param {string} timeEnd - HH:MM
@@ -146,31 +149,43 @@ export function getRateBreakdown(date, timeStart, timeEnd, bookingType, courts =
   const dayOfWeek = d.getDay();
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-  let primeHours = 0;
-  let nonPrimeHours = 0;
+  // Count half-hour slots for accurate calculation
+  let primeSlots = 0;
+  let nonPrimeSlots = 0;
 
-  for (let mins = startMinutes; mins < endMinutes; mins += 60) {
+  for (let mins = startMinutes; mins < endMinutes; mins += 30) {
     const hour = Math.floor(mins / 60);
     const isPrime = isWeekend || hour >= 17;
     if (isPrime) {
-      primeHours++;
+      primeSlots++;
     } else {
-      nonPrimeHours++;
+      nonPrimeSlots++;
     }
   }
 
-  const total = ((primeHours * 12.00) + (nonPrimeHours * 10.00)) * courts;
+  // Convert slots to hours for display
+  const primeHours = primeSlots / 2;
+  const nonPrimeHours = nonPrimeSlots / 2;
+
+  // Calculate total (slots × half-hour rate)
+  const total = ((primeSlots * 6.00) + (nonPrimeSlots * 5.00)) * courts;
+
+  // Format hours for display (show .5 for half hours)
+  const formatHours = (hrs) => {
+    if (hrs === Math.floor(hrs)) return `${hrs}hr`;
+    return `${hrs}hr`;
+  };
 
   // Build description
   let description = '';
   if (primeHours > 0 && nonPrimeHours > 0) {
-    description = `${nonPrimeHours}hr @ $10 + ${primeHours}hr @ $12`;
+    description = `${formatHours(nonPrimeHours)} @ $10 + ${formatHours(primeHours)} @ $12`;
     if (courts > 1) description += ` × ${courts} courts`;
   } else if (primeHours > 0) {
-    description = `${primeHours}hr @ $12 (Prime)`;
+    description = `${formatHours(primeHours)} @ $12 (Prime)`;
     if (courts > 1) description += ` × ${courts} courts`;
   } else {
-    description = `${nonPrimeHours}hr @ $10 (Non-Prime)`;
+    description = `${formatHours(nonPrimeHours)} @ $10 (Non-Prime)`;
     if (courts > 1) description += ` × ${courts} courts`;
   }
 
