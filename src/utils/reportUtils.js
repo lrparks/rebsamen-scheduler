@@ -850,6 +850,80 @@ export function getAvailabilityGrid(bookings, closures, date) {
   return { slots, closedCount };
 }
 
+// ============================================
+// PARTICIPATION METRICS
+// ============================================
+
+/**
+ * Get participation metrics for a date range
+ * @param {Array} bookings
+ * @param {string} startDate
+ * @param {string} endDate
+ * @returns {object}
+ */
+export function getParticipationMetrics(bookings, startDate, endDate) {
+  const rangeBookings = bookings.filter(b =>
+    b.date >= startDate &&
+    b.date <= endDate &&
+    b.status !== BOOKING_STATUS.CANCELLED
+  );
+
+  let totalParticipants = 0;
+  let adultParticipants = 0;
+  let youthParticipants = 0;
+
+  // Breakdown by booking type
+  const byType = {
+    open: { participants: 0, youth: 0 },
+    contractor: { participants: 0, youth: 0 },
+    team: { participants: 0, youth: 0 },
+    tournament: { participants: 0, youth: 0 },
+  };
+
+  rangeBookings.forEach(booking => {
+    const count = parseInt(booking.participant_count, 10) || 2; // Default to 2 if not set
+    const isYouth = booking.is_youth === 'TRUE' || booking.is_youth === true;
+
+    totalParticipants += count;
+    if (isYouth) {
+      youthParticipants += count;
+    } else {
+      adultParticipants += count;
+    }
+
+    // Categorize by booking type
+    if (booking.booking_type === BOOKING_TYPES.OPEN) {
+      byType.open.participants += count;
+      if (isYouth) byType.open.youth += count;
+    } else if (booking.booking_type === BOOKING_TYPES.CONTRACTOR) {
+      byType.contractor.participants += count;
+      if (isYouth) byType.contractor.youth += count;
+    } else if (booking.booking_type?.startsWith('team_')) {
+      byType.team.participants += count;
+      if (isYouth) byType.team.youth += count;
+    } else if (booking.booking_type === BOOKING_TYPES.TOURNAMENT) {
+      byType.tournament.participants += count;
+      if (isYouth) byType.tournament.youth += count;
+    }
+  });
+
+  const youthPercentage = totalParticipants > 0
+    ? Math.round((youthParticipants / totalParticipants) * 100)
+    : 0;
+
+  return {
+    total: totalParticipants,
+    adults: adultParticipants,
+    youth: youthParticipants,
+    youthPercentage,
+    byType,
+    bookingCount: rangeBookings.length,
+    avgPerBooking: rangeBookings.length > 0
+      ? Math.round((totalParticipants / rangeBookings.length) * 10) / 10
+      : 0,
+  };
+}
+
 /**
  * Get utilization stats excluding closed courts
  * @param {Array} bookings
