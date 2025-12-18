@@ -13,6 +13,8 @@ export const CONFIG = {
     contractors: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS9iggYOib3RykXB9pLf-GrS7IcZiuaOLy6e7Ve25z_PQEEc8Z4fBiPDu03_e7__jMK3GBfCHEpXyNA/pub?gid=52721266&single=true&output=csv',
     teams: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS9iggYOib3RykXB9pLf-GrS7IcZiuaOLy6e7Ve25z_PQEEc8Z4fBiPDu03_e7__jMK3GBfCHEpXyNA/pub?gid=1667747238&single=true&output=csv',
     tournaments: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS9iggYOib3RykXB9pLf-GrS7IcZiuaOLy6e7Ve25z_PQEEc8Z4fBiPDu03_e7__jMK3GBfCHEpXyNA/pub?gid=TOURNAMENTS_GID&single=true&output=csv',
+    // Court closures CSV - create a new sheet tab with columns: date, court, time_start, time_end, reason, is_active
+    closures: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS9iggYOib3RykXB9pLf-GrS7IcZiuaOLy6e7Ve25z_PQEEc8Z4fBiPDu03_e7__jMK3GBfCHEpXyNA/pub?gid=CLOSURES_GID&single=true&output=csv',
   },
 
   // Apps Script URL (LIVE)

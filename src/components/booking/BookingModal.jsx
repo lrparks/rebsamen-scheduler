@@ -95,7 +95,7 @@ export default function BookingModal({
   const [pendingBookings, setPendingBookings] = useState([]);
 
   const { initials } = useStaffContext();
-  const { addBookingLocal, updateBookingLocal, refreshBookings, getConflicts } = useBookingsContext();
+  const { addBookingLocal, updateBookingLocal, refreshBookings, getConflicts, getClosureConflicts } = useBookingsContext();
   const toast = useToast();
 
   // Determine mode and initialize form data
@@ -227,6 +227,7 @@ export default function BookingModal({
     if (!skipConflictCheck) {
       const allConflicts = [];
       for (const booking of proposedBookings) {
+        // Check booking conflicts
         const bookingConflicts = getConflicts(
           booking.date,
           booking.court,
@@ -234,6 +235,26 @@ export default function BookingModal({
           booking.time_end
         );
         allConflicts.push(...bookingConflicts);
+
+        // Check closure conflicts
+        const closureConflicts = getClosureConflicts(
+          booking.date,
+          booking.court,
+          booking.time_start,
+          booking.time_end
+        );
+        // Add closure info as pseudo-bookings for display
+        closureConflicts.forEach(closure => {
+          allConflicts.push({
+            booking_id: `CLOSURE-${closure.date}-${closure.court}`,
+            date: closure.date,
+            court: closure.court === 'all' ? 'All Courts' : closure.court,
+            time_start: closure.time_start || '00:00',
+            time_end: closure.time_end || '21:00',
+            customer_name: `CLOSED: ${closure.reason || 'Court Closure'}`,
+            booking_type: 'closure',
+          });
+        });
       }
 
       if (allConflicts.length > 0) {
