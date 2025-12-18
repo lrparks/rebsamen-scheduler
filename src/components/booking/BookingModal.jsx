@@ -7,7 +7,7 @@ import CheckInButton from './CheckInButton.jsx';
 import CancelModal from './CancelModal.jsx';
 import { generateBookingId, generateGroupId } from '../../utils/bookingId.js';
 import { createBooking, updateBooking } from '../../utils/api.js';
-import { formatDateISO, formatDateDisplay, formatTimeDisplay } from '../../utils/dateHelpers.js';
+import { formatDateISO, formatDateDisplay, formatTimeDisplay, normalizeTime } from '../../utils/dateHelpers.js';
 import { BOOKING_TYPES, PAYMENT_STATUS, CONFIG } from '../../config.js';
 import { useStaffContext } from '../../context/StaffContext.jsx';
 import { useBookingsContext } from '../../context/BookingsContext.jsx';
@@ -157,7 +157,11 @@ export default function BookingModal({
   }, [isOpen, booking, initialData]);
 
   const getDefaultEndTime = (startTime) => {
-    const [hour, minute] = startTime.split(':').map(Number);
+    const normalized = normalizeTime(startTime);
+    if (!normalized || !normalized.includes(':')) {
+      return '10:30'; // Default fallback
+    }
+    const [hour, minute] = normalized.split(':').map(Number);
     let endHour = hour + 1;
     let endMinute = minute + 30;
     if (endMinute >= 60) {

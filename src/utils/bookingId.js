@@ -1,3 +1,5 @@
+import { normalizeTime } from './dateHelpers.js';
+
 /**
  * Generate booking ID from date, court, and time
  * Format: DDCC-HHMM
@@ -8,14 +10,15 @@
  *
  * @param {Date|string} date - Booking date
  * @param {number} court - Court number (1-17)
- * @param {string} timeStart - Start time in HH:MM format
+ * @param {string|number} timeStart - Start time in HH:MM format or decimal
  * @returns {string} Booking ID in DDCC-HHMM format
  */
 export function generateBookingId(date, court, timeStart) {
   const d = new Date(date);
   const day = String(d.getDate()).padStart(2, '0');
   const courtStr = String(court).padStart(2, '0');
-  const [hour, minute] = timeStart.split(':');
+  const normalized = normalizeTime(timeStart);
+  const [hour, minute] = normalized.split(':');
 
   return `${day}${courtStr}-${hour}${minute}`;
 }
