@@ -25,7 +25,10 @@ From existing booking schema:
 Missing for participation metrics:
 - `participant_count` - number of players (default 2)
 - `is_youth` - all players under 18
-- `is_resident` - city resident (optional, lower priority)
+
+### Reporting Configuration (to add)
+- `monthly_revenue_target` - configurable target for revenue comparison
+- `operating_expenses` - for cost recovery % calculation
 
 ---
 
@@ -209,8 +212,7 @@ Full implementation of the board report format:
 
 4. **Participation Metrics** (Phase 2 dependent)
    - Total participants
-   - Adults vs Youth
-   - New vs Returning (requires customer tracking - future)
+   - Adults vs Youth breakdown
 
 5. **Booking Patterns**
    - Efficiency rate
@@ -348,30 +350,27 @@ Simple dropdown or tab navigation:
 
 ---
 
-## Questions / Decisions Needed
+## Decisions (Resolved)
 
-1. **Slot Definition**: Your example shows 221 total slots (13 × 17). Current config has 30-min slots = 25 slots/day. Should reports use 1-hour slots (13) or 30-min slots (25)?
-   - **Recommendation**: Use 1-hour reporting slots (13) to match your example
+1. **Slot Definition**: Use **1-hour slots** (13 per day × 17 courts = 221 total) for easier reporting math ✓
 
-2. **Revenue Targets**: Should monthly revenue targets be configurable in the app, or hardcoded initially?
-   - **Recommendation**: Start with config value, add UI later
+2. **Revenue Targets**: Configurable in Google Sheets Config tab ✓
 
-3. **Operating Expenses**: For cost recovery %, where does this number come from?
-   - **Recommendation**: Manual entry in config sheet, or skip this metric initially
+3. **Operating Expenses**: Configurable in Google Sheets Config tab (for cost recovery %) ✓
 
-4. **Customer Tracking**: For "new vs returning" metrics, do you want to track unique customers?
-   - **Recommendation**: Defer to Phase 4 - requires customer database
+4. **Customer Tracking**: **Removed from scope** - not tracking new vs returning customers ✓
 
-5. **Maintenance Integration**: Should the daily dashboard pull maintenance data, or keep maintenance on its own view?
-   - **Recommendation**: Include summary on daily dashboard, detailed view stays in Maintenance tab
+5. **Maintenance on Daily Dashboard**: **Yes** - include weekly completion grid + follow-up items (summary only, not detailed logs) ✓
 
 ---
 
-## Approval Checklist
+## Approval Status
 
-- [ ] Phase 1 scope (Daily + Weekly with existing data)
-- [ ] Phase 2 scope (participant_count, is_youth fields)
-- [ ] Phase 3 scope (Monthly report format)
-- [ ] UI layout approach
-- [ ] Slot definition (1-hour vs 30-min for reporting)
-- [ ] Defer customer tracking to future phase
+- [x] Phase 1 scope (Daily + Weekly with existing data)
+- [x] Phase 2 scope (participant_count, is_youth fields)
+- [x] Phase 3 scope (Monthly report format)
+- [x] UI layout approach
+- [x] Slot definition (1-hour slots)
+- [x] Config for revenue targets and operating expenses
+
+**APPROVED - Ready for implementation**
