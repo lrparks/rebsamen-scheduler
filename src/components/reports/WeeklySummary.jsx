@@ -131,21 +131,17 @@ export default function WeeklySummary({ weekStart }) {
         <BookingTypesCard breakdown={typeBreakdown} />
       </div>
 
-      {/* Row 2: Revenue & Participation */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Row 2: Revenue, Participation, Efficiency (33/33/33) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <RevenueCard revenue={revenue} />
         <ParticipationCard
           participation={participation}
           lastWeekParticipation={lastWeekParticipation}
         />
-      </div>
-
-      {/* Row 3: Efficiency */}
-      <div className="grid grid-cols-1 gap-4">
         <EfficiencyCard efficiency={efficiency} />
       </div>
 
-      {/* Row 4: Top Contractors & Top Teams */}
+      {/* Row 3: Top Contractors & Top Teams (50/50) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <TopContractorsCard
           contractors={topContractors}
