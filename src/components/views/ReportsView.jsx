@@ -8,7 +8,7 @@ import WeeklySummary from '../reports/WeeklySummary.jsx';
 /**
  * Main Reports View with sub-navigation for different report types
  */
-export default function ReportsView() {
+export default function ReportsView({ onEmptyCellClick }) {
   const [reportType, setReportType] = useState('daily');
   const [selectedDate, setSelectedDate] = useState(formatDateISO(new Date()));
 
@@ -159,7 +159,7 @@ export default function ReportsView() {
 
       {/* Report Content */}
       {reportType === 'daily' ? (
-        <DailyDashboard selectedDate={selectedDate} />
+        <DailyDashboard selectedDate={selectedDate} onEmptyCellClick={onEmptyCellClick} />
       ) : (
         <WeeklySummary weekStart={weekStart} />
       )}

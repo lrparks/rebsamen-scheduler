@@ -203,7 +203,7 @@ function AppContent() {
         return <SearchView onBookingClick={handleBookingClick} />;
 
       case 'reports':
-        return <ReportsView />;
+        return <ReportsView onEmptyCellClick={handleEmptyCellClick} />;
 
       case 'maintenance':
         return <MaintenanceView />;

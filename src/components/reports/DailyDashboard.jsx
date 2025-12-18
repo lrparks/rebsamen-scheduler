@@ -29,7 +29,7 @@ import { CONFIG } from '../../config.js';
  * │ Daily Maintenance                                    │
  * └──────────────────────────────────────────────────────┘
  */
-export default function DailyDashboard({ selectedDate }) {
+export default function DailyDashboard({ selectedDate, onEmptyCellClick }) {
   const { bookings, closures, loading } = useBookingsContext();
   const { contractors } = useContractors();
 
@@ -106,7 +106,12 @@ export default function DailyDashboard({ selectedDate }) {
       </div>
 
       {/* Available Slots Collapsible Bar */}
-      <AvailableSlotsBar availabilityGrid={availabilityGrid} utilization={utilization} />
+      <AvailableSlotsBar
+        availabilityGrid={availabilityGrid}
+        utilization={utilization}
+        selectedDate={selectedDate}
+        onEmptyCellClick={onEmptyCellClick}
+      />
 
       {/* Row 2: Revenue & Contractors */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -252,7 +257,7 @@ function ActivityCard({ activity }) {
 /**
  * Collapsible Available Slots Bar with color-coded grid
  */
-function AvailableSlotsBar({ availabilityGrid, utilization }) {
+function AvailableSlotsBar({ availabilityGrid, utilization, selectedDate, onEmptyCellClick }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const totalAvailable = utilization.TOTAL.available;
@@ -289,7 +294,11 @@ function AvailableSlotsBar({ availabilityGrid, utilization }) {
       {/* Expanded Grid */}
       {isExpanded && (
         <div className="p-4 border-t border-gray-200">
-          <AvailabilityGridDisplay grid={availabilityGrid} />
+          <AvailabilityGridDisplay
+            grid={availabilityGrid}
+            selectedDate={selectedDate}
+            onEmptyCellClick={onEmptyCellClick}
+          />
         </div>
       )}
     </div>
@@ -297,21 +306,127 @@ function AvailableSlotsBar({ availabilityGrid, utilization }) {
 }
 
 /**
- * Color-coded availability grid display
+ * Color-coded availability grid display with click/drag booking
  */
-function AvailabilityGridDisplay({ grid }) {
+function AvailabilityGridDisplay({ grid, selectedDate, onEmptyCellClick }) {
+  // Drag selection state
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState(null); // { court, timeIndex }
+  const [dragEnd, setDragEnd] = useState(null);
+
   const periods = [
     { key: 'MORNING', label: TIME_PERIODS.MORNING.label },
     { key: 'AFTERNOON', label: TIME_PERIODS.AFTERNOON.label },
     { key: 'PRIME', label: TIME_PERIODS.PRIME.label },
   ];
 
-  // Group slots by period
-  const slotsByPeriod = {
-    MORNING: grid.slots.filter(s => s.period === 'MORNING'),
-    AFTERNOON: grid.slots.filter(s => s.period === 'AFTERNOON'),
-    PRIME: grid.slots.filter(s => s.period === 'PRIME'),
+  // Flatten all slots with timeIndex for drag tracking
+  const allSlots = useMemo(() => {
+    const slots = [];
+    let timeIndex = 0;
+    ['MORNING', 'AFTERNOON', 'PRIME'].forEach(period => {
+      const periodSlots = grid.slots.filter(s => s.period === period);
+      periodSlots.forEach(slot => {
+        slots.push({ ...slot, timeIndex });
+        timeIndex++;
+      });
+    });
+    return slots;
+  }, [grid.slots]);
+
+  // Calculate selection range
+  const selectionRange = useMemo(() => {
+    if (!dragStart || !dragEnd) return null;
+    const minCourt = Math.min(dragStart.court, dragEnd.court);
+    const maxCourt = Math.max(dragStart.court, dragEnd.court);
+    const minTimeIndex = Math.min(dragStart.timeIndex, dragEnd.timeIndex);
+    const maxTimeIndex = Math.max(dragStart.timeIndex, dragEnd.timeIndex);
+    return { minCourt, maxCourt, minTimeIndex, maxTimeIndex };
+  }, [dragStart, dragEnd]);
+
+  // Check if cell is selected
+  const isCellSelected = (court, timeIndex) => {
+    if (!selectionRange) return false;
+    return (
+      court >= selectionRange.minCourt &&
+      court <= selectionRange.maxCourt &&
+      timeIndex >= selectionRange.minTimeIndex &&
+      timeIndex <= selectionRange.maxTimeIndex
+    );
   };
+
+  // Handle drag start (only on available cells)
+  const handleMouseDown = (court, timeIndex, available, closed) => {
+    if (!available || closed || !onEmptyCellClick) return;
+    setIsDragging(true);
+    setDragStart({ court, timeIndex });
+    setDragEnd({ court, timeIndex });
+  };
+
+  // Handle drag move
+  const handleMouseEnter = (court, timeIndex) => {
+    if (isDragging) {
+      setDragEnd({ court, timeIndex });
+    }
+  };
+
+  // Handle drag end
+  const handleMouseUp = () => {
+    if (isDragging && dragStart && dragEnd && selectionRange && onEmptyCellClick) {
+      const { minCourt, maxCourt, minTimeIndex, maxTimeIndex } = selectionRange;
+
+      // Get time values from slots
+      const startSlot = allSlots[minTimeIndex];
+      const endSlot = allSlots[maxTimeIndex];
+
+      if (startSlot && endSlot) {
+        // Calculate end time (1 hour after end slot start)
+        const endHour = parseInt(endSlot.time.split(':')[0], 10) + 1;
+        const endTime = `${String(endHour).padStart(2, '0')}:00`;
+
+        // Get selected courts
+        const selectedCourts = [];
+        for (let c = minCourt; c <= maxCourt; c++) {
+          selectedCourts.push(c);
+        }
+
+        onEmptyCellClick({
+          date: selectedDate,
+          court: minCourt,
+          courts: selectedCourts,
+          time: startSlot.time,
+          timeStart: startSlot.time,
+          timeEnd: endTime,
+          isMultiCourt: selectedCourts.length > 1,
+        });
+      }
+    }
+
+    setIsDragging(false);
+    setDragStart(null);
+    setDragEnd(null);
+  };
+
+  // Global mouseup listener
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isDragging) {
+        handleMouseUp();
+      }
+    };
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, [isDragging, dragStart, dragEnd, selectionRange]);
+
+  // Prevent text selection during drag
+  useEffect(() => {
+    if (isDragging) {
+      document.body.style.userSelect = 'none';
+    } else {
+      document.body.style.userSelect = '';
+    }
+    return () => { document.body.style.userSelect = ''; };
+  }, [isDragging]);
 
   // Court headers
   const courtHeaders = [];
@@ -319,8 +434,22 @@ function AvailabilityGridDisplay({ grid }) {
     courtHeaders.push(i === CONFIG.STADIUM_COURT_NUMBER ? 'Stad' : String(i));
   }
 
+  // Group slots by period for display
+  const slotsByPeriod = {
+    MORNING: allSlots.filter(s => s.period === 'MORNING'),
+    AFTERNOON: allSlots.filter(s => s.period === 'AFTERNOON'),
+    PRIME: allSlots.filter(s => s.period === 'PRIME'),
+  };
+
   return (
     <div className="overflow-x-auto">
+      {onEmptyCellClick && (
+        <div className="mb-2 text-xs text-gray-500 flex items-center gap-2">
+          <span className="bg-green-100 text-green-700 px-2 py-1 rounded">
+            Click or drag on green cells to book
+          </span>
+        </div>
+      )}
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b border-gray-300">
@@ -351,26 +480,35 @@ function AvailabilityGridDisplay({ grid }) {
                 {periodSlots.map(slot => (
                   <tr key={slot.time} className="border-b border-gray-100">
                     <td className="py-1 pr-2 text-gray-600">{slot.label}</td>
-                    {slot.courts.map((court, idx) => (
-                      <td key={idx} className="text-center py-1 px-1">
-                        <div
-                          className={`w-5 h-5 mx-auto rounded ${
-                            court.closed
-                              ? 'bg-gray-300'
-                              : court.available
-                                ? 'bg-green-400'
-                                : 'bg-red-400'
-                          }`}
-                          title={
-                            court.closed
-                              ? `Court ${court.court} - Closed`
-                              : court.available
-                                ? `Court ${court.court} - Available`
-                                : `Court ${court.court} - Booked`
-                          }
-                        />
-                      </td>
-                    ))}
+                    {slot.courts.map((court, idx) => {
+                      const isSelected = isCellSelected(court.court, slot.timeIndex);
+                      const isAvailable = court.available && !court.closed;
+
+                      return (
+                        <td key={idx} className="text-center py-1 px-1">
+                          <div
+                            onMouseDown={() => handleMouseDown(court.court, slot.timeIndex, court.available, court.closed)}
+                            onMouseEnter={() => handleMouseEnter(court.court, slot.timeIndex)}
+                            className={`w-5 h-5 mx-auto rounded transition-all ${
+                              isSelected
+                                ? 'bg-blue-500 ring-2 ring-blue-300 scale-110'
+                                : court.closed
+                                  ? 'bg-gray-300'
+                                  : court.available
+                                    ? 'bg-green-400 hover:bg-green-500 cursor-pointer'
+                                    : 'bg-red-400'
+                            } ${isAvailable && onEmptyCellClick ? 'cursor-pointer' : ''}`}
+                            title={
+                              court.closed
+                                ? `Court ${court.court} - Closed`
+                                : court.available
+                                  ? `Court ${court.court} at ${slot.label} - Click to book`
+                                  : `Court ${court.court} - Booked`
+                            }
+                          />
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </React.Fragment>
@@ -382,7 +520,7 @@ function AvailabilityGridDisplay({ grid }) {
       {/* Legend */}
       <div className="mt-3 flex gap-4 text-xs text-gray-600">
         <span className="flex items-center gap-1">
-          <div className="w-4 h-4 rounded bg-green-400" /> Open
+          <div className="w-4 h-4 rounded bg-green-400" /> Open (click to book)
         </span>
         <span className="flex items-center gap-1">
           <div className="w-4 h-4 rounded bg-red-400" /> Booked
@@ -390,6 +528,11 @@ function AvailabilityGridDisplay({ grid }) {
         <span className="flex items-center gap-1">
           <div className="w-4 h-4 rounded bg-gray-300" /> Closed
         </span>
+        {isDragging && (
+          <span className="flex items-center gap-1">
+            <div className="w-4 h-4 rounded bg-blue-500" /> Selected
+          </span>
+        )}
       </div>
     </div>
   );
