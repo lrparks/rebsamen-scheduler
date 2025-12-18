@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Input from '../common/Input.jsx';
 import { Textarea } from '../common/Input.jsx';
 import Select, { MultiSelect } from '../common/Select.jsx';
 import DatePicker from '../common/DatePicker.jsx';
 import { getTimeSlots, getEndTimeOptions, formatTimeDisplay } from '../../utils/dateHelpers.js';
-import { calculateRate, isPrimeTime, isFreeBooking } from '../../utils/rates.js';
+import { calculateTotalRate, getRateBreakdown, isFreeBooking } from '../../utils/rates.js';
 import { BOOKING_TYPES, PAYMENT_STATUS, PAYMENT_METHODS, CONFIG } from '../../config.js';
 import { useCourts } from '../../hooks/useCourts.js';
 import { useContractors } from '../../hooks/useContractors.js';
@@ -29,12 +29,33 @@ export default function BookingForm({
 
   // Auto-calculate rate when relevant fields change
   useEffect(() => {
-    if (!isEditing && formData.date && formData.timeStart && formData.bookingType) {
-      const rate = calculateRate(formData.date, formData.timeStart, formData.bookingType);
+    if (!isEditing && formData.date && formData.timeStart && formData.timeEnd && formData.bookingType) {
       const numCourts = formData.courts?.length || 1;
-      onChange({ paymentAmount: (rate * numCourts).toFixed(2) });
+      const total = calculateTotalRate(
+        formData.date,
+        formData.timeStart,
+        formData.timeEnd,
+        formData.bookingType,
+        numCourts
+      );
+      onChange({ paymentAmount: total.toFixed(2) });
     }
-  }, [formData.date, formData.timeStart, formData.bookingType, formData.courts?.length, isEditing]);
+  }, [formData.date, formData.timeStart, formData.timeEnd, formData.bookingType, formData.courts?.length, isEditing]);
+
+  // Get rate breakdown for display
+  const rateBreakdown = useMemo(() => {
+    if (!formData.date || !formData.timeStart || !formData.timeEnd || !formData.bookingType) {
+      return null;
+    }
+    const numCourts = formData.courts?.length || 1;
+    return getRateBreakdown(
+      formData.date,
+      formData.timeStart,
+      formData.timeEnd,
+      formData.bookingType,
+      numCourts
+    );
+  }, [formData.date, formData.timeStart, formData.timeEnd, formData.bookingType, formData.courts?.length]);
 
   // Generate court options
   const courts = courtOptions.length > 0 ? courtOptions : Array.from(
@@ -286,11 +307,22 @@ export default function BookingForm({
           <h4 className="text-sm font-medium text-gray-700">Payment Information</h4>
 
           {/* Rate Info */}
-          <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-800">
-            {isPrimeTime(formData.date, formData.timeStart)
-              ? 'Prime Time Rate: $12.00 per court'
-              : 'Non-Prime Rate: $10.00 per court'}
-          </div>
+          {rateBreakdown && (
+            <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-800">
+              <div className="font-medium">{rateBreakdown.description}</div>
+              {rateBreakdown.totalHours > 0 && (
+                <div className="text-xs mt-1 text-blue-600">
+                  {rateBreakdown.totalHours} hour{rateBreakdown.totalHours !== 1 ? 's' : ''}
+                  {rateBreakdown.primeHours > 0 && rateBreakdown.nonPrimeHours > 0 && (
+                    <span> ({rateBreakdown.nonPrimeHours}hr non-prime + {rateBreakdown.primeHours}hr prime)</span>
+                  )}
+                  {(formData.courts?.length || 1) > 1 && (
+                    <span> × {formData.courts?.length} courts</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-3 gap-3">
             <Select
