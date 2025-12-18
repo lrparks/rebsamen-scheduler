@@ -302,24 +302,34 @@ export default function BookingForm({
       </div>
 
       {/* Participation Info */}
-      <div className="grid grid-cols-2 gap-3">
-        <Select
-          label="Number of Players"
-          value={formData.participantCount || 2}
-          onChange={handleFieldChange('participantCount')}
-          options={[1, 2, 3, 4, 5, 6, 7, 8].map(n => ({ value: n, label: String(n) }))}
-        />
-        <div className="flex items-center gap-2 pt-6">
-          <input
-            type="checkbox"
-            id="isYouth"
-            checked={formData.isYouth || false}
-            onChange={(e) => onChange({ isYouth: e.target.checked })}
-            className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+      <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-3">
+          <Select
+            label="Players per court"
+            value={formData.participantCount || 2}
+            onChange={handleFieldChange('participantCount')}
+            options={[1, 2, 3, 4, 5, 6, 7, 8].map(n => ({ value: n, label: String(n) }))}
           />
-          <label htmlFor="isYouth" className="text-sm text-gray-700">
-            Youth booking (all players under 18)
-          </label>
+          <div className="flex items-center gap-2 pt-6">
+            <input
+              type="checkbox"
+              id="isYouth"
+              checked={formData.isYouth || false}
+              onChange={(e) => onChange({ isYouth: e.target.checked })}
+              className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+            />
+            <label htmlFor="isYouth" className="text-sm text-gray-700">
+              Youth booking (all under 18)
+            </label>
+          </div>
+        </div>
+        {/* Participation calculation tooltip */}
+        <div className="bg-gray-50 rounded-lg px-3 py-2 text-xs text-gray-600">
+          <span className="font-medium">Recording: </span>
+          {(formData.participantCount || 2) * (isEditing ? 1 : (formData.courts?.length || 1))} {formData.isYouth ? 'youth' : 'adult'} participant{((formData.participantCount || 2) * (isEditing ? 1 : (formData.courts?.length || 1))) !== 1 ? 's' : ''}
+          {!isEditing && (formData.courts?.length || 1) > 1 && (
+            <span className="text-gray-500"> ({formData.participantCount || 2} × {formData.courts?.length} courts)</span>
+          )}
         </div>
       </div>
 
