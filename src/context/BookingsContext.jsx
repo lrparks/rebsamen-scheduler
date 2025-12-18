@@ -112,6 +112,40 @@ export function BookingsProvider({ children }) {
   }, [getBookingsForDateAndCourt]);
 
   /**
+   * Get conflicting bookings for a proposed booking
+   * @param {string} date
+   * @param {number} court
+   * @param {string} timeStart
+   * @param {string} timeEnd
+   * @param {string} excludeId - Booking ID to exclude (for edits)
+   * @returns {Array} - List of conflicting bookings
+   */
+  const getConflicts = useCallback((date, court, timeStart, timeEnd, excludeId = null) => {
+    const courtBookings = getBookingsForDateAndCourt(date, court)
+      .filter(b => b.status === 'active' && b.booking_id !== excludeId);
+
+    const [startHour, startMin] = timeStart.split(':').map(Number);
+    const [endHour, endMin] = timeEnd.split(':').map(Number);
+    const newStart = startHour * 60 + startMin;
+    const newEnd = endHour * 60 + endMin;
+
+    const conflicts = [];
+    for (const booking of courtBookings) {
+      const [bStartHour, bStartMin] = booking.time_start.split(':').map(Number);
+      const [bEndHour, bEndMin] = booking.time_end.split(':').map(Number);
+      const bStart = bStartHour * 60 + bStartMin;
+      const bEnd = bEndHour * 60 + bEndMin;
+
+      // Check for overlap
+      if (newStart < bEnd && newEnd > bStart) {
+        conflicts.push(booking);
+      }
+    }
+
+    return conflicts;
+  }, [getBookingsForDateAndCourt]);
+
+  /**
    * Add a new booking to local state (optimistic update)
    */
   const addBookingLocal = useCallback((booking) => {
@@ -138,6 +172,7 @@ export function BookingsProvider({ children }) {
     getBookingsForDateAndCourt,
     getBookingById,
     isSlotAvailable,
+    getConflicts,
     addBookingLocal,
     updateBookingLocal,
   };

@@ -275,6 +275,44 @@ export default function BookingForm({
         </div>
       )}
 
+      {/* Recurring Booking Options - only show in create mode */}
+      {!isEditing && !isMultiDay && (
+        <div className="border-t border-gray-200 pt-4 space-y-3">
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="recurring"
+              checked={formData.recurring || false}
+              onChange={(e) => onChange({ recurring: e.target.checked, recurringWeeks: e.target.checked ? 4 : 0 })}
+              className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+            />
+            <label htmlFor="recurring" className="text-sm font-medium text-gray-700">
+              Repeat Weekly
+            </label>
+          </div>
+
+          {formData.recurring && (
+            <div className="ml-7 space-y-3">
+              <div className="flex items-center gap-3">
+                <label className="text-sm text-gray-600">Repeat for</label>
+                <select
+                  value={formData.recurringWeeks || 4}
+                  onChange={(e) => onChange({ recurringWeeks: parseInt(e.target.value, 10) })}
+                  className="rounded-md border-gray-300 text-sm focus:ring-green-500 focus:border-green-500"
+                >
+                  {[2, 3, 4, 6, 8, 10, 12, 16, 20, 24].map(n => (
+                    <option key={n} value={n}>{n} weeks</option>
+                  ))}
+                </select>
+              </div>
+              <p className="text-xs text-gray-500">
+                This will create {formData.recurringWeeks || 4} bookings, one for each week on {formData.date ? new Date(formData.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' }) + 's' : 'the same day'}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Notes */}
       <Textarea
         label="Notes"
