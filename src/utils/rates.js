@@ -1,17 +1,19 @@
 import { BOOKING_TYPES } from '../config.js';
+import { normalizeTime } from './dateHelpers.js';
 
 /**
  * Determine if a time slot is prime time
  * Prime: M-F 5pm-9pm, Sat-Sun all day
  * @param {Date|string} date - Booking date
- * @param {string} timeStart - Start time in HH:MM format
+ * @param {string|number} timeStart - Start time in HH:MM format or decimal
  * @returns {boolean}
  */
 export function isPrimeTime(date, timeStart) {
   if (!date || !timeStart) return false;
   const d = new Date(date);
   const dayOfWeek = d.getDay(); // 0=Sun, 6=Sat
-  const hour = parseInt(timeStart.split(':')[0], 10);
+  const normalized = normalizeTime(timeStart);
+  const hour = normalized ? parseInt(normalized.split(':')[0], 10) : 0;
 
   // Weekend (Sat=6, Sun=0) = all prime
   if (dayOfWeek === 0 || dayOfWeek === 6) {
@@ -62,8 +64,8 @@ export function getRateDescription(date, timeStart) {
 /**
  * Calculate total for multiple time slots
  * @param {Date|string} date
- * @param {string} timeStart
- * @param {string} timeEnd
+ * @param {string|number} timeStart
+ * @param {string|number} timeEnd
  * @param {string} bookingType
  * @param {number} courts - Number of courts
  * @returns {number}
@@ -72,8 +74,13 @@ export function calculateTotalRate(date, timeStart, timeEnd, bookingType, courts
   const baseRate = calculateRate(date, timeStart, bookingType);
 
   // Calculate duration in 30-min slots
-  const [startHour, startMin] = timeStart.split(':').map(Number);
-  const [endHour, endMin] = timeEnd.split(':').map(Number);
+  const normalizedStart = normalizeTime(timeStart);
+  const normalizedEnd = normalizeTime(timeEnd);
+
+  if (!normalizedStart || !normalizedEnd) return baseRate * courts;
+
+  const [startHour, startMin] = normalizedStart.split(':').map(Number);
+  const [endHour, endMin] = normalizedEnd.split(':').map(Number);
 
   const startMinutes = startHour * 60 + startMin;
   const endMinutes = endHour * 60 + endMin;

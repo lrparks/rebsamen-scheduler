@@ -1,6 +1,60 @@
 import { CONFIG } from '../config.js';
 
 /**
+ * Normalize time to HH:MM format
+ * Handles: HH:MM, H:MM, decimal (0.375), 12-hour AM/PM
+ * @param {string|number} time
+ * @returns {string} Time in HH:MM format
+ */
+export function normalizeTime(time) {
+  if (!time) return '';
+
+  const str = String(time).trim();
+
+  // Already in HH:MM or H:MM format
+  const timeMatch = str.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (timeMatch) {
+    const [, hours, minutes] = timeMatch;
+    return `${hours.padStart(2, '0')}:${minutes}`;
+  }
+
+  // Handle decimal format (Google Sheets stores times as fractions of a day)
+  const decimal = parseFloat(str);
+  if (!isNaN(decimal) && decimal >= 0 && decimal < 1) {
+    const totalMinutes = Math.round(decimal * 24 * 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  }
+
+  // Handle 12-hour format with AM/PM
+  const ampmMatch = str.match(/^(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)$/i);
+  if (ampmMatch) {
+    let [, hours, minutes, period] = ampmMatch;
+    let h = parseInt(hours, 10);
+    if (period.toLowerCase() === 'pm' && h !== 12) h += 12;
+    if (period.toLowerCase() === 'am' && h === 12) h = 0;
+    return `${h.toString().padStart(2, '0')}:${minutes}`;
+  }
+
+  return str;
+}
+
+/**
+ * Parse time string to hours and minutes
+ * @param {string|number} time
+ * @returns {{ hours: number, minutes: number }}
+ */
+function parseTime(time) {
+  const normalized = normalizeTime(time);
+  if (!normalized || !normalized.includes(':')) {
+    return { hours: 0, minutes: 0 };
+  }
+  const [hours, minutes] = normalized.split(':').map(Number);
+  return { hours: hours || 0, minutes: minutes || 0 };
+}
+
+/**
  * Format date as YYYY-MM-DD
  * @param {Date} date
  * @returns {string}
@@ -44,12 +98,12 @@ export function formatDateShort(date) {
 
 /**
  * Format time for display (e.g., "9:00 AM")
- * @param {string} time24 - Time in HH:MM format
+ * @param {string|number} time24 - Time in HH:MM format or decimal
  * @returns {string}
  */
 export function formatTimeDisplay(time24) {
   if (!time24) return '';
-  const [hours, minutes] = time24.split(':').map(Number);
+  const { hours, minutes } = parseTime(time24);
   const period = hours >= 12 ? 'PM' : 'AM';
   const displayHours = hours % 12 || 12;
   return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
@@ -57,12 +111,12 @@ export function formatTimeDisplay(time24) {
 
 /**
  * Format time short (e.g., "9:00a")
- * @param {string} time24 - Time in HH:MM format
+ * @param {string|number} time24 - Time in HH:MM format or decimal
  * @returns {string}
  */
 export function formatTimeShort(time24) {
   if (!time24) return '';
-  const [hours, minutes] = time24.split(':').map(Number);
+  const { hours, minutes } = parseTime(time24);
   const period = hours >= 12 ? 'p' : 'a';
   const displayHours = hours % 12 || 12;
   return `${displayHours}:${String(minutes).padStart(2, '0')}${period}`;
@@ -173,11 +227,11 @@ export function getCurrentTime() {
 
 /**
  * Calculate position percentage for current time line
- * @param {string} currentTime - Current time in HH:MM format
+ * @param {string|number} currentTime - Current time in HH:MM format or decimal
  * @returns {number|null} Percentage position, or null if outside operating hours
  */
 export function getTimePosition(currentTime) {
-  const [hour, minute] = currentTime.split(':').map(Number);
+  const { hours: hour, minutes: minute } = parseTime(currentTime);
   const currentMinutes = hour * 60 + minute;
 
   const startMinutes = CONFIG.DAY_START_HOUR * 60 + CONFIG.DAY_START_MINUTE;

@@ -7,7 +7,7 @@ import Input from '../common/Input.jsx';
 import { Textarea } from '../common/Input.jsx';
 import { DateRangePicker } from '../common/DatePicker.jsx';
 import Modal from '../common/Modal.jsx';
-import { formatDateISO, formatDateDisplay, formatTimeDisplay } from '../../utils/dateHelpers.js';
+import { formatDateISO, formatDateDisplay, formatTimeDisplay, normalizeTime } from '../../utils/dateHelpers.js';
 import { useCourts } from '../../hooks/useCourts.js';
 import { useToast } from '../common/Toast.jsx';
 
@@ -51,8 +51,11 @@ export default function ContractorView({ onBookingClick }) {
   // Calculate stats
   const stats = useMemo(() => {
     const totalHours = filteredBookings.reduce((sum, b) => {
-      const [startH, startM] = b.time_start.split(':').map(Number);
-      const [endH, endM] = b.time_end.split(':').map(Number);
+      const startNorm = normalizeTime(b.time_start);
+      const endNorm = normalizeTime(b.time_end);
+      if (!startNorm || !endNorm) return sum;
+      const [startH, startM] = startNorm.split(':').map(Number);
+      const [endH, endM] = endNorm.split(':').map(Number);
       const hours = (endH * 60 + endM - startH * 60 - startM) / 60;
       return sum + hours;
     }, 0);
