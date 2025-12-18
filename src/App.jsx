@@ -14,7 +14,7 @@ import SearchView from './components/views/SearchView.jsx';
 import MaintenanceView from './components/views/MaintenanceView.jsx';
 import BookingModal from './components/booking/BookingModal.jsx';
 import Modal from './components/common/Modal.jsx';
-import { formatDateISO } from './utils/dateHelpers.js';
+import { formatDateISO, formatDateDisplay } from './utils/dateHelpers.js';
 import { useBookings } from './hooks/useBookings.js';
 
 const APP_MODE_KEY = 'rebsamen_app_mode';
@@ -141,12 +141,31 @@ function AppContent() {
         return (
           <>
             <ColorLegend />
-            <div className="p-4">
-              <DailyGrid
-                selectedDate={selectedDate}
-                onBookingClick={handleBookingClick}
-                onEmptyCellClick={handleEmptyCellClick}
-              />
+            <div className="p-4 print-container">
+              {/* Print Header - only visible when printing */}
+              <div className="print-header hidden">
+                <h1>Rebsamen Tennis Center - All Courts</h1>
+                <p>{formatDateDisplay(selectedDate)}</p>
+              </div>
+              {/* Print button */}
+              <div className="flex justify-end mb-2 no-print">
+                <button
+                  onClick={() => window.print()}
+                  className="inline-flex items-center px-3 py-1.5 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  </svg>
+                  Print
+                </button>
+              </div>
+              <div className="print-grid">
+                <DailyGrid
+                  selectedDate={selectedDate}
+                  onBookingClick={handleBookingClick}
+                  onEmptyCellClick={handleEmptyCellClick}
+                />
+              </div>
             </div>
           </>
         );

@@ -87,7 +87,104 @@ select {
 
 /* Print styles */
 @media print {
-  .no-print {
+  /* Hide non-printable elements */
+  .no-print,
+  header,
+  nav,
+  .modal-backdrop,
+  button:not(.print-show) {
     display: none !important;
+  }
+
+  /* Reset page styling */
+  body {
+    background: white !important;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Print-specific layout */
+  .print-container {
+    width: 100%;
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Print header */
+  .print-header {
+    display: block !important;
+    text-align: center;
+    padding: 0.5rem 0;
+    border-bottom: 2px solid #000;
+    margin-bottom: 0.5rem;
+  }
+
+  .print-header h1 {
+    font-size: 1.25rem;
+    margin: 0;
+    font-weight: bold;
+  }
+
+  .print-header p {
+    font-size: 0.875rem;
+    margin: 0.25rem 0 0;
+    color: #666;
+  }
+
+  /* Grid adjustments for print */
+  .print-grid {
+    border: 1px solid #000 !important;
+    page-break-inside: avoid;
+  }
+
+  .print-grid .booking-cell {
+    border: 1px solid #999 !important;
+    font-size: 0.65rem !important;
+    padding: 2px !important;
+  }
+
+  /* Booking colors for print (simplified) */
+  .print-grid [class*="bg-blue"] {
+    background-color: #e0e7ff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-grid [class*="bg-green"] {
+    background-color: #d1fae5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-grid [class*="bg-amber"],
+  .print-grid [class*="bg-yellow"] {
+    background-color: #fef3c7 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-grid [class*="bg-purple"] {
+    background-color: #ede9fe !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-grid [class*="bg-red"] {
+    background-color: #fee2e2 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Page setup */
+  @page {
+    size: landscape;
+    margin: 0.5in;
+  }
+
+  /* Force background colors */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }
