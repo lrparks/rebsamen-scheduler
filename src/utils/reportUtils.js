@@ -1206,6 +1206,50 @@ export function getYearOverYearComparison(bookings, currentMonthStart) {
 }
 
 /**
+ * Get participation comparison (MoM and YoY)
+ * @param {Array} bookings
+ * @param {Date} currentMonthStart
+ * @returns {object}
+ */
+export function getParticipationComparison(bookings, currentMonthStart) {
+  const thisMonthStart = formatDateISO(currentMonthStart);
+  const thisMonthEnd = formatDateISO(getMonthEnd(currentMonthStart));
+
+  // Last month
+  const lastMonthDate = new Date(currentMonthStart);
+  lastMonthDate.setMonth(lastMonthDate.getMonth() - 1);
+  const lastMonthStart = formatDateISO(getMonthStart(lastMonthDate));
+  const lastMonthEnd = formatDateISO(getMonthEnd(lastMonthDate));
+
+  // Last year same month
+  const lastYearDate = new Date(currentMonthStart);
+  lastYearDate.setFullYear(lastYearDate.getFullYear() - 1);
+  const lastYearMonthStart = formatDateISO(getMonthStart(lastYearDate));
+  const lastYearMonthEnd = formatDateISO(getMonthEnd(lastYearDate));
+
+  const thisMonth = getParticipationMetrics(bookings, thisMonthStart, thisMonthEnd);
+  const lastMonth = getParticipationMetrics(bookings, lastMonthStart, lastMonthEnd);
+  const lastYear = getParticipationMetrics(bookings, lastYearMonthStart, lastYearMonthEnd);
+
+  return {
+    thisMonth,
+    lastMonth,
+    lastYear,
+    momChange: {
+      total: thisMonth.total - lastMonth.total,
+      adults: thisMonth.adults - lastMonth.adults,
+      youth: thisMonth.youth - lastMonth.youth,
+    },
+    yoyChange: {
+      total: thisMonth.total - lastYear.total,
+      adults: thisMonth.adults - lastYear.adults,
+      youth: thisMonth.youth - lastYear.youth,
+    },
+    hasLastYearData: lastYear.total > 0,
+  };
+}
+
+/**
  * Get cancellation breakdown by reason for a date range
  * @param {Array} bookings
  * @param {string} startDate

@@ -8,6 +8,7 @@ import {
   getMonthEnd,
   getMonthlyComparison,
   getYearOverYearComparison,
+  getParticipationComparison,
   getRevenueForRange,
   getBookingEfficiency,
   getContractorHoursForRange,
@@ -18,7 +19,6 @@ import {
   getTournamentMetrics,
   getYTDRange,
   getCancellationBreakdown,
-  getBookingTypeBreakdown,
   formatCurrency,
   TIME_PERIODS,
   getTotalSlotsForPeriod,
@@ -56,6 +56,11 @@ export default function MonthlyReport({ monthStart }) {
 
   const yoyComparison = useMemo(() =>
     getYearOverYearComparison(bookings, monthStart),
+    [bookings, monthStart]
+  );
+
+  const participationComparison = useMemo(() =>
+    getParticipationComparison(bookings, monthStart),
     [bookings, monthStart]
   );
 
@@ -104,11 +109,6 @@ export default function MonthlyReport({ monthStart }) {
     [bookings, tournaments, ytdRange.start, ytdRange.end]
   );
 
-  const typeBreakdown = useMemo(() =>
-    getBookingTypeBreakdown(bookings, startDate, endDate),
-    [bookings, startDate, endDate]
-  );
-
   // Utilization by time period
   const utilizationByPeriod = useMemo(() => {
     const monthBookings = bookings.filter(b =>
@@ -117,7 +117,6 @@ export default function MonthlyReport({ monthStart }) {
       b.status !== 'cancelled'
     );
 
-    // Days in month
     const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
 
     const periodStats = {};
@@ -125,7 +124,6 @@ export default function MonthlyReport({ monthStart }) {
       const period = TIME_PERIODS[periodKey];
       const totalSlots = getTotalSlotsForPeriod(periodKey) * daysInMonth;
 
-      // Calculate booked hours in this period
       let bookedHours = 0;
       monthBookings.forEach(b => {
         const bookingStart = parseTimeToMinutes(b.time_start);
@@ -182,203 +180,274 @@ export default function MonthlyReport({ monthStart }) {
         <p className="text-sm text-gray-600">Generated {new Date().toLocaleDateString()}</p>
       </div>
 
-      {/* Section 1: Executive Summary */}
-      <ExecutiveSummaryCard
-        courtHours={courtHours}
-        revenue={revenue.total}
-        revenueTarget={revenueTarget}
-        costRecovery={costRecovery}
-        comparison={comparison}
-        yoyComparison={yoyComparison}
-      />
+      {/* Row 1: Executive Summary - 33/33/33 */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Column 1: Court Hours + Revenue + Cost Recovery */}
+        <ExecutiveMetricsCard
+          courtHours={courtHours}
+          revenue={revenue.total}
+          revenueTarget={revenueTarget}
+          costRecovery={costRecovery}
+          comparison={comparison}
+          yoyComparison={yoyComparison}
+        />
 
-      {/* Section 2 & 3: Utilization and Financial (side by side) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <UtilizationCard
-          utilizationByPeriod={utilizationByPeriod}
+        {/* Column 2: Utilization Summary */}
+        <UtilizationSummaryCard
           overallUtilization={comparison.thisMonth.utilization}
+          primeUtilization={comparison.thisMonth.primeUtilization}
           utilizationTarget={utilizationTarget}
           primeUtilizationTarget={primeUtilizationTarget}
+          comparison={comparison}
+          yoyComparison={yoyComparison}
         />
+
+        {/* Column 3: Participation Summary */}
+        <ParticipationSummaryCard
+          participation={participation}
+          participationComparison={participationComparison}
+        />
+      </div>
+
+      {/* Row 2: Details - 33/33/33 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <UtilizationDetailsCard
+          utilizationByPeriod={utilizationByPeriod}
+          primeUtilizationTarget={primeUtilizationTarget}
+        />
+        <ParticipationDetailsCard participation={participation} />
         <FinancialCard
           revenue={revenue}
           revenuePerHour={revenuePerHour}
           waivedValue={waivedValue}
-          typeBreakdown={typeBreakdown}
         />
       </div>
 
-      {/* Section 4 & 5: Participation and Booking Patterns (side by side) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <ParticipationCard participation={participation} />
-        <BookingPatternsCard
-          efficiency={efficiency}
-          cancellations={cancellations}
-        />
-      </div>
-
-      {/* Section 6: Contractor Utilization */}
-      <ContractorCard
-        contractorData={contractorData}
-        totalContractorHours={totalContractorHours}
-        totalCourtHours={courtHours}
-        contractorPercentage={contractorPercentage}
-      />
-
-      {/* Section 7: Tournaments & Events */}
+      {/* Row 3: Tournaments - Full Width */}
       <TournamentsCard
         monthMetrics={tournamentMetrics}
         ytdMetrics={ytdTournamentMetrics}
         monthName={monthName}
       />
+
+      {/* Row 4: Booking Patterns + Contractor - 50/50 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <BookingPatternsCard
+          efficiency={efficiency}
+          cancellations={cancellations}
+        />
+        <ContractorCard
+          contractorData={contractorData}
+          totalContractorHours={totalContractorHours}
+          totalCourtHours={courtHours}
+          contractorPercentage={contractorPercentage}
+        />
+      </div>
     </div>
   );
 }
 
 /**
- * Executive Summary Card
+ * Executive Metrics Card - Court Hours, Revenue, Cost Recovery
  */
-function ExecutiveSummaryCard({ courtHours, revenue, revenueTarget, costRecovery, comparison, yoyComparison }) {
+function ExecutiveMetricsCard({ courtHours, revenue, revenueTarget, costRecovery, comparison, yoyComparison }) {
   return (
     <div className="bg-white rounded-lg border border-gray-200">
       <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-        <h3 className="font-medium text-gray-900">Executive Summary</h3>
+        <h3 className="font-medium text-gray-900">Key Metrics</h3>
       </div>
-      <div className="p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Court Hours */}
-          <div>
-            <div className="text-3xl font-bold text-gray-900">{Math.round(courtHours)}</div>
-            <div className="text-sm text-gray-500">Court Hours Booked</div>
-            <div className="mt-2 space-y-1 text-sm">
-              <ComparisonLine
-                label="vs Last Month"
-                value={comparison.change.hours}
-                suffix=" hrs"
-              />
-              {yoyComparison.hasLastYearData && (
-                <ComparisonLine
-                  label="vs Last Year"
-                  value={yoyComparison.change.hours}
-                  suffix=" hrs"
-                  showPercent={yoyComparison.change.hoursPercent}
-                />
-              )}
-            </div>
-          </div>
-
-          {/* Revenue */}
-          <div>
-            <div className="text-3xl font-bold text-gray-900">{formatCurrency(revenue)}</div>
-            <div className="text-sm text-gray-500">Total Revenue</div>
-            {revenueTarget > 0 && (
-              <div className="mt-1">
-                <TargetProgress current={revenue} target={revenueTarget} />
-              </div>
-            )}
-            <div className="mt-2 space-y-1 text-sm">
-              <ComparisonLine
-                label="vs Last Month"
-                value={comparison.change.revenue}
-                isCurrency
-              />
-              {yoyComparison.hasLastYearData && (
-                <ComparisonLine
-                  label="vs Last Year"
-                  value={yoyComparison.change.revenue}
-                  isCurrency
-                  showPercent={yoyComparison.change.revenuePercent}
-                />
-              )}
-            </div>
-          </div>
-
-          {/* Cost Recovery */}
-          <div>
-            {costRecovery !== null ? (
-              <>
-                <div className="text-3xl font-bold text-gray-900">{costRecovery}%</div>
-                <div className="text-sm text-gray-500">Cost Recovery</div>
-                <div className="mt-2">
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full ${costRecovery >= 100 ? 'bg-green-500' : costRecovery >= 75 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                      style={{ width: `${Math.min(costRecovery, 100)}%` }}
-                    />
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {costRecovery >= 100 ? 'Target met' : `${100 - costRecovery}% to break even`}
-                  </div>
-                </div>
-              </>
+      <div className="p-4 space-y-4">
+        {/* Court Hours */}
+        <div>
+          <div className="text-2xl font-bold text-gray-900">{Math.round(courtHours)} hrs</div>
+          <div className="text-sm text-gray-500">Court Hours Booked</div>
+          <div className="mt-1 flex gap-3 text-xs">
+            <ComparisonBadge label="MoM" value={comparison.change.hours} suffix=" hrs" />
+            {yoyComparison.hasLastYearData ? (
+              <ComparisonBadge label="YoY" value={yoyComparison.change.hours} suffix=" hrs" />
             ) : (
-              <>
-                <div className="text-3xl font-bold text-gray-400">--</div>
-                <div className="text-sm text-gray-500">Cost Recovery</div>
-                <div className="text-xs text-gray-400 mt-2">
-                  Set operating_expenses in config
-                </div>
-              </>
+              <span className="text-gray-400">YoY: no data</span>
             )}
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
 
-/**
- * Utilization Card
- */
-function UtilizationCard({ utilizationByPeriod, overallUtilization, utilizationTarget, primeUtilizationTarget }) {
-  return (
-    <div className="bg-white rounded-lg border border-gray-200">
-      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-        <h3 className="font-medium text-gray-900">Utilization Metrics</h3>
-      </div>
-      <div className="p-4">
-        {/* Overall */}
-        <div className="mb-4 pb-4 border-b border-gray-200">
-          <div className="flex justify-between items-end">
-            <div>
-              <div className="text-2xl font-bold text-gray-900">{overallUtilization}%</div>
-              <div className="text-sm text-gray-500">Overall Utilization</div>
-            </div>
-            {utilizationTarget > 0 && (
-              <div className="text-right">
-                <span className={`text-sm font-medium ${overallUtilization >= utilizationTarget ? 'text-green-600' : 'text-amber-600'}`}>
-                  Target: {utilizationTarget}%
-                </span>
-              </div>
-            )}
-          </div>
-          {utilizationTarget > 0 && (
-            <div className="mt-2">
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full ${overallUtilization >= utilizationTarget ? 'bg-green-500' : 'bg-amber-500'}`}
-                  style={{ width: `${Math.min((overallUtilization / utilizationTarget) * 100, 100)}%` }}
-                />
-              </div>
+        {/* Revenue */}
+        <div className="pt-3 border-t border-gray-100">
+          <div className="text-2xl font-bold text-gray-900">{formatCurrency(revenue)}</div>
+          <div className="text-sm text-gray-500">Total Revenue</div>
+          {revenueTarget > 0 && (
+            <div className="mt-1">
+              <TargetProgress current={revenue} target={revenueTarget} />
             </div>
           )}
+          <div className="mt-1 flex gap-3 text-xs">
+            <ComparisonBadge label="MoM" value={comparison.change.revenue} isCurrency />
+            {yoyComparison.hasLastYearData ? (
+              <ComparisonBadge label="YoY" value={yoyComparison.change.revenue} isCurrency />
+            ) : (
+              <span className="text-gray-400">YoY: no data</span>
+            )}
+          </div>
         </div>
 
-        {/* By Time Period */}
+        {/* Cost Recovery */}
+        <div className="pt-3 border-t border-gray-100">
+          {costRecovery !== null ? (
+            <>
+              <div className="flex items-baseline gap-2">
+                <div className="text-2xl font-bold text-gray-900">{costRecovery}%</div>
+                <span className={`text-sm ${costRecovery >= 100 ? 'text-green-600' : 'text-amber-600'}`}>
+                  {costRecovery >= 100 ? 'Target met' : `${100 - costRecovery}% to break even`}
+                </span>
+              </div>
+              <div className="text-sm text-gray-500">Cost Recovery</div>
+            </>
+          ) : (
+            <>
+              <div className="text-2xl font-bold text-gray-400">--</div>
+              <div className="text-sm text-gray-500">Cost Recovery</div>
+              <div className="text-xs text-gray-400">Set operating_expenses in config</div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Utilization Summary Card - Just percentages with MoM/YoY
+ */
+function UtilizationSummaryCard({ overallUtilization, primeUtilization, utilizationTarget, primeUtilizationTarget, comparison, yoyComparison }) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200">
+      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+        <h3 className="font-medium text-gray-900">Utilization</h3>
+      </div>
+      <div className="p-4 space-y-4">
+        {/* Overall */}
+        <div>
+          <div className="flex items-baseline gap-2">
+            <div className="text-2xl font-bold text-gray-900">{overallUtilization}%</div>
+            {utilizationTarget > 0 && (
+              <span className={`text-sm ${overallUtilization >= utilizationTarget ? 'text-green-600' : 'text-amber-600'}`}>
+                (target: {utilizationTarget}%)
+              </span>
+            )}
+          </div>
+          <div className="text-sm text-gray-500">Overall Utilization</div>
+          <div className="mt-1 flex gap-3 text-xs">
+            <ComparisonBadge label="MoM" value={comparison.change.utilization} suffix="%" />
+            {yoyComparison.hasLastYearData ? (
+              <ComparisonBadge label="YoY" value={yoyComparison.change.hoursPercent} suffix="%" />
+            ) : (
+              <span className="text-gray-400">YoY: no data</span>
+            )}
+          </div>
+        </div>
+
+        {/* Prime Time */}
+        <div className="pt-3 border-t border-gray-100">
+          <div className="flex items-baseline gap-2">
+            <div className="text-2xl font-bold text-gray-900">{primeUtilization}%</div>
+            {primeUtilizationTarget > 0 && (
+              <span className={`text-sm ${primeUtilization >= primeUtilizationTarget ? 'text-green-600' : 'text-amber-600'}`}>
+                (target: {primeUtilizationTarget}%)
+              </span>
+            )}
+          </div>
+          <div className="text-sm text-gray-500">Prime Time (5-9pm)</div>
+          <div className="mt-1 flex gap-3 text-xs">
+            <ComparisonBadge label="MoM" value={comparison.change.primeUtilization} suffix="%" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Participation Summary Card - Adult/Youth with MoM/YoY
+ */
+function ParticipationSummaryCard({ participation, participationComparison }) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200">
+      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+        <h3 className="font-medium text-gray-900">Participation</h3>
+      </div>
+      <div className="p-4 space-y-4">
+        {/* Adults */}
+        <div>
+          <div className="text-2xl font-bold text-gray-900">{participation.adults}</div>
+          <div className="text-sm text-gray-500">Adult Participants</div>
+          <div className="mt-1 flex gap-3 text-xs">
+            <ComparisonBadge label="MoM" value={participationComparison.momChange.adults} />
+            {participationComparison.hasLastYearData ? (
+              <ComparisonBadge label="YoY" value={participationComparison.yoyChange.adults} />
+            ) : (
+              <span className="text-gray-400">YoY: no data</span>
+            )}
+          </div>
+        </div>
+
+        {/* Youth */}
+        <div className="pt-3 border-t border-gray-100">
+          <div className="text-2xl font-bold text-blue-600">{participation.youth}</div>
+          <div className="text-sm text-gray-500">Youth Participants</div>
+          <div className="mt-1 flex gap-3 text-xs">
+            <ComparisonBadge label="MoM" value={participationComparison.momChange.youth} />
+            {participationComparison.hasLastYearData ? (
+              <ComparisonBadge label="YoY" value={participationComparison.yoyChange.youth} />
+            ) : (
+              <span className="text-gray-400">YoY: no data</span>
+            )}
+          </div>
+        </div>
+
+        {/* Total */}
+        <div className="pt-3 border-t border-gray-100 text-center">
+          <span className="text-lg font-semibold text-gray-700">{participation.total} total</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Utilization Details Card - By time period
+ */
+function UtilizationDetailsCard({ utilizationByPeriod, primeUtilizationTarget }) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200">
+      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+        <h3 className="font-medium text-gray-900">Utilization by Time Period</h3>
+      </div>
+      <div className="p-4">
         <div className="space-y-3">
           {Object.entries(utilizationByPeriod).map(([key, data]) => {
             const target = key === 'PRIME' ? primeUtilizationTarget : null;
             return (
-              <div key={key} className="flex justify-between items-center">
-                <span className="text-sm text-gray-700">{data.label}</span>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-gray-500">{data.booked} / {data.total} hrs</span>
-                  <span className={`text-sm font-medium w-12 text-right ${
+              <div key={key}>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-sm text-gray-700">{data.label}</span>
+                  <span className={`text-sm font-medium ${
                     target && data.utilization >= target ? 'text-green-600' :
                     target && data.utilization < target ? 'text-amber-600' : 'text-gray-900'
                   }`}>
                     {data.utilization}%
                   </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full ${
+                      key === 'PRIME' ? 'bg-green-500' :
+                      key === 'AFTERNOON' ? 'bg-blue-500' : 'bg-gray-400'
+                    }`}
+                    style={{ width: `${Math.min(data.utilization, 100)}%` }}
+                  />
+                </div>
+                <div className="text-xs text-gray-500 mt-0.5">
+                  {data.booked} / {data.total} hrs
                 </div>
               </div>
             );
@@ -390,9 +459,71 @@ function UtilizationCard({ utilizationByPeriod, overallUtilization, utilizationT
 }
 
 /**
+ * Participation Details Card
+ */
+function ParticipationDetailsCard({ participation }) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200">
+      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+        <h3 className="font-medium text-gray-900">Participation Details</h3>
+      </div>
+      <div className="p-4">
+        {participation.total === 0 ? (
+          <div className="text-sm text-gray-500">No participation data this month</div>
+        ) : (
+          <>
+            {/* Youth percentage bar */}
+            <div className="mb-4">
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-gray-600">Youth vs Adult</span>
+                <span className="font-medium">{participation.youthPercentage}% youth</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3 flex overflow-hidden">
+                <div
+                  className="h-3 bg-blue-500"
+                  style={{ width: `${participation.youthPercentage}%` }}
+                />
+                <div
+                  className="h-3 bg-gray-400"
+                  style={{ width: `${100 - participation.youthPercentage}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>Youth: {participation.youth}</span>
+                <span>Adult: {participation.adults}</span>
+              </div>
+            </div>
+
+            {/* By booking type */}
+            <div className="space-y-2 pt-3 border-t border-gray-100">
+              <div className="text-xs font-medium text-gray-500 uppercase">By Booking Type</div>
+              {Object.entries(participation.byType || {}).map(([type, count]) => (
+                count > 0 && (
+                  <div key={type} className="flex justify-between text-sm">
+                    <span className="text-gray-600 capitalize">{type.replace('_', ' ')}</span>
+                    <span className="font-medium">{count}</span>
+                  </div>
+                )
+              ))}
+            </div>
+
+            <div className="pt-3 border-t border-gray-100 mt-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Avg per booking</span>
+                <span className="font-medium">{participation.avgPerBooking} players</span>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Financial Metrics Card
  */
-function FinancialCard({ revenue, revenuePerHour, waivedValue, typeBreakdown }) {
+function FinancialCard({ revenue, revenuePerHour, waivedValue }) {
   return (
     <div className="bg-white rounded-lg border border-gray-200">
       <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
@@ -401,12 +532,8 @@ function FinancialCard({ revenue, revenuePerHour, waivedValue, typeBreakdown }) 
       <div className="p-4">
         {/* Revenue per hour */}
         <div className="mb-4 pb-4 border-b border-gray-200">
-          <div className="flex justify-between items-center">
-            <div>
-              <div className="text-xl font-bold text-gray-900">{formatCurrency(revenuePerHour)}</div>
-              <div className="text-sm text-gray-500">Revenue per Court Hour</div>
-            </div>
-          </div>
+          <div className="text-xl font-bold text-gray-900">{formatCurrency(revenuePerHour)}</div>
+          <div className="text-sm text-gray-500">Revenue per Court Hour</div>
         </div>
 
         {/* Revenue by source */}
@@ -421,7 +548,7 @@ function FinancialCard({ revenue, revenuePerHour, waivedValue, typeBreakdown }) 
             <span className="font-medium">{formatCurrency(revenue.byType.contractors)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-600">League/Team Fees</span>
+            <span className="text-gray-600">League/Team</span>
             <span className="font-medium">{formatCurrency(revenue.byType.leagues)}</span>
           </div>
           <div className="flex justify-between text-sm">
@@ -431,18 +558,10 @@ function FinancialCard({ revenue, revenuePerHour, waivedValue, typeBreakdown }) 
         </div>
 
         {/* Waived Value */}
-        <div className="pt-4 border-t border-gray-200">
+        <div className="pt-3 border-t border-gray-200">
           <div className="text-xs font-medium text-gray-500 uppercase mb-2">Waived Value</div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Count</span>
-            <span className="font-medium">{waivedValue.count} bookings</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Hours</span>
-            <span className="font-medium">{Math.round(waivedValue.hours)} hrs</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Estimated Value</span>
+            <span className="text-gray-600">{waivedValue.count} bookings ({Math.round(waivedValue.hours)} hrs)</span>
             <span className="font-medium text-amber-600">{formatCurrency(waivedValue.value)}</span>
           </div>
         </div>
@@ -452,63 +571,98 @@ function FinancialCard({ revenue, revenuePerHour, waivedValue, typeBreakdown }) 
 }
 
 /**
- * Participation Card
+ * Tournaments & Events Card - Full Width with Players
  */
-function ParticipationCard({ participation }) {
+function TournamentsCard({ monthMetrics, ytdMetrics, monthName }) {
+  // Calculate total players from tournaments
+  const monthPlayers = monthMetrics.tournaments.reduce((sum, t) => {
+    return sum + (parseInt(t.players, 10) || 0);
+  }, 0);
+  const ytdPlayers = ytdMetrics.tournaments.reduce((sum, t) => {
+    return sum + (parseInt(t.players, 10) || 0);
+  }, 0);
+
   return (
     <div className="bg-white rounded-lg border border-gray-200">
       <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-        <h3 className="font-medium text-gray-900">Participation Metrics</h3>
+        <h3 className="font-medium text-gray-900">Tournaments & Events</h3>
       </div>
       <div className="p-4">
-        {participation.total === 0 ? (
-          <div className="text-sm text-gray-500">No participation data this month</div>
-        ) : (
-          <>
-            {/* Total */}
-            <div className="mb-4 pb-4 border-b border-gray-200">
-              <div className="text-2xl font-bold text-gray-900">{participation.total}</div>
-              <div className="text-sm text-gray-500">Total Participants</div>
-            </div>
-
-            {/* Adult vs Youth */}
-            <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          {/* This Month Stats */}
+          <div>
+            <div className="text-xs font-medium text-gray-500 uppercase mb-3">This Month</div>
+            <div className="space-y-3">
               <div>
-                <div className="text-xl font-bold text-gray-900">{participation.adults}</div>
-                <div className="text-sm text-gray-500">Adults</div>
+                <div className="text-2xl font-bold text-gray-900">{monthMetrics.eventsHosted}</div>
+                <div className="text-sm text-gray-500">Events Hosted</div>
               </div>
               <div>
-                <div className="text-xl font-bold text-blue-600">{participation.youth}</div>
-                <div className="text-sm text-gray-500">Youth (under 18)</div>
+                <div className="text-lg font-semibold text-gray-900">{Math.round(monthMetrics.courtHours)} hrs</div>
+                <div className="text-sm text-gray-500">Court Hours</div>
+              </div>
+              <div>
+                <div className="text-lg font-semibold text-gray-900">{monthMetrics.courtsUsed}</div>
+                <div className="text-sm text-gray-500">Courts Used</div>
+              </div>
+              <div>
+                <div className="text-lg font-semibold text-blue-600">{monthPlayers || '--'}</div>
+                <div className="text-sm text-gray-500">Players</div>
               </div>
             </div>
+          </div>
 
-            {/* Youth percentage bar */}
-            <div className="mb-4">
-              <div className="w-full bg-gray-200 rounded-full h-3">
-                <div
-                  className="h-3 rounded-full bg-blue-500"
-                  style={{ width: `${participation.youthPercentage}%` }}
-                />
+          {/* YTD Stats */}
+          <div>
+            <div className="text-xs font-medium text-gray-500 uppercase mb-3">Year to Date</div>
+            <div className="space-y-3">
+              <div>
+                <div className="text-2xl font-bold text-gray-900">{ytdMetrics.eventsHosted}</div>
+                <div className="text-sm text-gray-500">Total Events</div>
               </div>
-              <div className="text-xs text-gray-500 mt-1">
-                {participation.youthPercentage}% youth participation
+              <div>
+                <div className="text-lg font-semibold text-gray-900">{Math.round(ytdMetrics.courtHours)} hrs</div>
+                <div className="text-sm text-gray-500">Court Hours</div>
+              </div>
+              <div>
+                <div className="text-lg font-semibold text-gray-900">{ytdMetrics.bookingCount}</div>
+                <div className="text-sm text-gray-500">Total Bookings</div>
+              </div>
+              <div>
+                <div className="text-lg font-semibold text-blue-600">{ytdPlayers || '--'}</div>
+                <div className="text-sm text-gray-500">Players</div>
               </div>
             </div>
+          </div>
 
-            {/* Average per booking */}
-            <div className="pt-4 border-t border-gray-200">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Avg per booking</span>
-                <span className="font-medium">{participation.avgPerBooking} players</span>
+          {/* Events List - spans 2 columns */}
+          <div className="md:col-span-2">
+            <div className="text-xs font-medium text-gray-500 uppercase mb-3">Events This Month</div>
+            {monthMetrics.tournaments.length === 0 ? (
+              <div className="text-sm text-gray-500">No tournaments this month</div>
+            ) : (
+              <div className="space-y-2">
+                {monthMetrics.tournaments.map(t => (
+                  <div key={t.tournament_id} className="flex justify-between items-start p-2 bg-gray-50 rounded">
+                    <div>
+                      <div className="font-medium text-gray-900">{t.name}</div>
+                      <div className="text-xs text-gray-500">
+                        {t.start_date}{t.end_date && t.end_date !== t.start_date ? ` - ${t.end_date}` : ''}
+                        {t.organizer && ` • ${t.organizer}`}
+                      </div>
+                    </div>
+                    {t.players && (
+                      <div className="text-right">
+                        <div className="font-medium text-blue-600">{t.players}</div>
+                        <div className="text-xs text-gray-500">players</div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-              <div className="flex justify-between text-sm mt-1">
-                <span className="text-gray-600">Total bookings</span>
-                <span className="font-medium">{participation.bookingCount}</span>
-              </div>
-            </div>
-          </>
-        )}
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -528,31 +682,29 @@ function BookingPatternsCard({ efficiency, cancellations }) {
           <div className="text-sm text-gray-500">No bookings this month</div>
         ) : (
           <>
-            {/* Efficiency metrics */}
             <div className="grid grid-cols-3 gap-4 mb-4 pb-4 border-b border-gray-200">
               <div className="text-center">
                 <div className="text-xl font-bold text-green-600">{efficiency.completedRate}%</div>
-                <div className="text-xs text-gray-500">Completion Rate</div>
+                <div className="text-xs text-gray-500">Completion</div>
               </div>
               <div className="text-center">
                 <div className={`text-xl font-bold ${efficiency.cancelledRate > 10 ? 'text-red-600' : 'text-gray-900'}`}>
                   {efficiency.cancelledRate}%
                 </div>
-                <div className="text-xs text-gray-500">Cancellation Rate</div>
+                <div className="text-xs text-gray-500">Cancelled</div>
               </div>
               <div className="text-center">
                 <div className={`text-xl font-bold ${efficiency.noShowRate > 5 ? 'text-red-600' : 'text-gray-900'}`}>
                   {efficiency.noShowRate}%
                 </div>
-                <div className="text-xs text-gray-500">No-Show Rate</div>
+                <div className="text-xs text-gray-500">No-Show</div>
               </div>
             </div>
 
-            {/* Cancellation breakdown */}
             {cancellations.total > 0 && (
-              <div>
+              <div className="mb-4">
                 <div className="text-xs font-medium text-gray-500 uppercase mb-2">
-                  Cancellation Reasons ({cancellations.total} total)
+                  Cancellation Reasons ({cancellations.total})
                 </div>
                 <div className="space-y-1">
                   {cancellations.byReason.weather > 0 && (
@@ -563,13 +715,13 @@ function BookingPatternsCard({ efficiency, cancellations }) {
                   )}
                   {cancellations.byReason.customer > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Customer Request</span>
+                      <span className="text-gray-600">Customer</span>
                       <span className="font-medium">{cancellations.byReason.customer}</span>
                     </div>
                   )}
                   {cancellations.byReason.facility > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Facility Issue</span>
+                      <span className="text-gray-600">Facility</span>
                       <span className="font-medium">{cancellations.byReason.facility}</span>
                     </div>
                   )}
@@ -583,13 +735,8 @@ function BookingPatternsCard({ efficiency, cancellations }) {
               </div>
             )}
 
-            {/* No-show and check-in stats */}
-            <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="pt-3 border-t border-gray-200">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">No-shows</span>
-                <span className="font-medium">{efficiency.noShows}</span>
-              </div>
-              <div className="flex justify-between text-sm mt-1">
                 <span className="text-gray-600">Check-in Rate</span>
                 <span className="font-medium">{efficiency.checkInRate}%</span>
               </div>
@@ -627,7 +774,6 @@ function ContractorCard({ contractorData, totalContractorHours, totalCourtHours,
                   <th className="text-right py-2 font-medium text-gray-700">Hours</th>
                   <th className="text-right py-2 font-medium text-gray-700">Revenue</th>
                   <th className="text-right py-2 font-medium text-gray-700">$/Hr</th>
-                  <th className="text-right py-2 font-medium text-gray-700">% of Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -635,25 +781,13 @@ function ContractorCard({ contractorData, totalContractorHours, totalCourtHours,
                   const hourlyRate = contractor.totalHours > 0
                     ? contractor.revenue / contractor.totalHours
                     : 0;
-                  const percentOfTotal = totalCourtHours > 0
-                    ? Math.round((contractor.totalHours / totalCourtHours) * 100)
-                    : 0;
 
                   return (
                     <tr key={contractor.id} className="border-b border-gray-100">
                       <td className="py-2 text-gray-900">{contractor.name}</td>
-                      <td className="py-2 text-right text-gray-900">
-                        {Math.round(contractor.totalHours)}
-                      </td>
-                      <td className="py-2 text-right text-gray-900">
-                        {formatCurrency(contractor.revenue)}
-                      </td>
-                      <td className="py-2 text-right text-gray-900">
-                        {formatCurrency(hourlyRate)}
-                      </td>
-                      <td className="py-2 text-right text-gray-500">
-                        {percentOfTotal}%
-                      </td>
+                      <td className="py-2 text-right text-gray-900">{Math.round(contractor.totalHours)}</td>
+                      <td className="py-2 text-right text-gray-900">{formatCurrency(contractor.revenue)}</td>
+                      <td className="py-2 text-right text-gray-900">{formatCurrency(hourlyRate)}</td>
                     </tr>
                   );
                 })}
@@ -672,7 +806,6 @@ function ContractorCard({ contractorData, totalContractorHours, totalCourtHours,
                         : 0
                     )}
                   </td>
-                  <td className="py-2 text-right">{contractorPercentage}%</td>
                 </tr>
               </tfoot>
             </table>
@@ -684,87 +817,11 @@ function ContractorCard({ contractorData, totalContractorHours, totalCourtHours,
 }
 
 /**
- * Tournaments & Events Card
+ * Comparison Badge - Compact MoM/YoY indicator
  */
-function TournamentsCard({ monthMetrics, ytdMetrics, monthName }) {
-  return (
-    <div className="bg-white rounded-lg border border-gray-200">
-      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-        <h3 className="font-medium text-gray-900">Tournaments & Events</h3>
-      </div>
-      <div className="p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* This Month */}
-          <div>
-            <div className="text-xs font-medium text-gray-500 uppercase mb-3">This Month</div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Events Hosted</span>
-                <span className="font-medium text-lg">{monthMetrics.eventsHosted}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Court Hours Used</span>
-                <span className="font-medium">{Math.round(monthMetrics.courtHours)} hrs</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Courts Used</span>
-                <span className="font-medium">{monthMetrics.courtsUsed}</span>
-              </div>
-            </div>
-
-            {/* List tournaments */}
-            {monthMetrics.tournaments.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <div className="text-xs font-medium text-gray-500 uppercase mb-2">Events</div>
-                <ul className="space-y-1">
-                  {monthMetrics.tournaments.map(t => (
-                    <li key={t.tournament_id} className="text-sm text-gray-700">
-                      {t.name}
-                      <span className="text-gray-400 ml-1">
-                        ({t.start_date}{t.end_date && t.end_date !== t.start_date ? ` - ${t.end_date}` : ''})
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-
-          {/* Year to Date */}
-          <div>
-            <div className="text-xs font-medium text-gray-500 uppercase mb-3">Year to Date</div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Total Events</span>
-                <span className="font-medium text-lg">{ytdMetrics.eventsHosted}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Court Hours Used</span>
-                <span className="font-medium">{Math.round(ytdMetrics.courtHours)} hrs</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Total Bookings</span>
-                <span className="font-medium">{ytdMetrics.bookingCount}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Comparison line showing MoM or YoY change
- */
-function ComparisonLine({ label, value, suffix = '', isCurrency = false, showPercent = null }) {
-  if (value === 0 && showPercent === null) {
-    return (
-      <div className="flex justify-between text-gray-500">
-        <span>{label}</span>
-        <span>—</span>
-      </div>
-    );
+function ComparisonBadge({ label, value, suffix = '', isCurrency = false }) {
+  if (value === 0) {
+    return <span className="text-gray-400">{label}: —</span>;
   }
 
   const isPositive = value > 0;
@@ -772,13 +829,9 @@ function ComparisonLine({ label, value, suffix = '', isCurrency = false, showPer
   const prefix = isPositive ? '+' : '';
 
   return (
-    <div className="flex justify-between">
-      <span className="text-gray-500">{label}</span>
-      <span className={`font-medium ${color}`}>
-        {prefix}{isCurrency ? formatCurrency(value) : value}{suffix}
-        {showPercent !== null && ` (${showPercent > 0 ? '+' : ''}${showPercent}%)`}
-      </span>
-    </div>
+    <span className={color}>
+      {label}: {prefix}{isCurrency ? formatCurrency(value) : Math.round(value)}{suffix}
+    </span>
   );
 }
 
@@ -795,7 +848,7 @@ function TargetProgress({ current, target }) {
         <span className={isOnTarget ? 'text-green-600' : 'text-amber-600'}>
           {percentage}% of target
         </span>
-        <span className="text-gray-500">Target: {formatCurrency(target)}</span>
+        <span className="text-gray-500">{formatCurrency(target)}</span>
       </div>
       <div className="w-full bg-gray-200 rounded-full h-1.5">
         <div
