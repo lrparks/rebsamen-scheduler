@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { formatDateISO, formatDateDisplay, addDays, parseDate } from '../../utils/dateHelpers.js';
-import { getWeekStart, getWeekEnd, getMonthStart } from '../../utils/reportUtils.js';
+import { getWeekStart, getWeekEnd, getMonthStart, getMonthEnd } from '../../utils/reportUtils.js';
 import Button, { IconButton } from '../common/Button.jsx';
 import DailyDashboard from '../reports/DailyDashboard.jsx';
 import WeeklySummary from '../reports/WeeklySummary.jsx';
 import MonthlyReport from '../reports/MonthlyReport.jsx';
+import InvoiceReport from '../reports/InvoiceReport.jsx';
 
 /**
  * Main Reports View with sub-navigation for different report types
@@ -18,6 +19,10 @@ export default function ReportsView({ onEmptyCellClick }) {
 
   // Month navigation for monthly report
   const [monthStart, setMonthStart] = useState(() => getMonthStart(new Date()));
+
+  // Invoice date range (default to current month)
+  const [invoiceStartDate, setInvoiceStartDate] = useState(() => formatDateISO(getMonthStart(new Date())));
+  const [invoiceEndDate, setInvoiceEndDate] = useState(() => formatDateISO(getMonthEnd(new Date())));
 
   const today = formatDateISO(new Date());
   const isToday = selectedDate === today;
@@ -133,6 +138,16 @@ export default function ReportsView({ onEmptyCellClick }) {
             >
               Monthly
             </button>
+            <button
+              onClick={() => setReportType('invoice')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                reportType === 'invoice'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Invoice
+            </button>
           </div>
 
           {/* Date/Week/Month Navigation */}
@@ -227,6 +242,25 @@ export default function ReportsView({ onEmptyCellClick }) {
             </div>
           )}
 
+          {reportType === 'invoice' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">From:</span>
+              <input
+                type="date"
+                value={invoiceStartDate}
+                onChange={(e) => setInvoiceStartDate(e.target.value)}
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              />
+              <span className="text-sm text-gray-600">To:</span>
+              <input
+                type="date"
+                value={invoiceEndDate}
+                onChange={(e) => setInvoiceEndDate(e.target.value)}
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              />
+            </div>
+          )}
+
           {/* Print Button */}
           <Button variant="outline" size="sm" onClick={handlePrint} className="no-print">
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -246,6 +280,9 @@ export default function ReportsView({ onEmptyCellClick }) {
       )}
       {reportType === 'monthly' && (
         <MonthlyReport monthStart={monthStart} />
+      )}
+      {reportType === 'invoice' && (
+        <InvoiceReport startDate={invoiceStartDate} endDate={invoiceEndDate} />
       )}
     </div>
   );
