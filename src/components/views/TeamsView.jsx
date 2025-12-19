@@ -88,31 +88,38 @@ export default function TeamsView({ onBookingClick }) {
 
   // Filter bookings
   const filteredBookings = useMemo(() => {
+    // Get selected team info if a specific team is selected
+    const selectedTeam = selectedTeamId !== 'all'
+      ? teams.find(t => t.team_id === selectedTeamId)
+      : null;
+    const selectedTeamName = selectedTeam?.team_name || selectedTeam?.name || null;
+
     return bookings.filter(b => {
       if (!b.booking_type?.startsWith('team_')) return false;
       if (b.status === 'cancelled') return false;
       if (bookingsFilter === 'upcoming' && b.date < today) return false;
       if (bookingsFilter === 'past' && b.date >= today) return false;
+
       // Map team type filter to booking type for comparison
       if (teamTypeFilter !== 'all') {
         const expectedBookingType = TEAM_TYPE_TO_BOOKING_TYPE[teamTypeFilter] || teamTypeFilter;
         if (b.booking_type !== expectedBookingType) return false;
       }
-      // Filter by team - check entity_id first, then fall back to customer_name
-      if (selectedTeamId !== 'all') {
-        const team = teams.find(t => t.team_id === selectedTeamId);
-        // Check entity_id match OR customer_name match
-        const matchesEntityId = b.entity_id === selectedTeamId;
-        const matchesCustomerName = team && (
-          b.customer_name === team.team_name ||
-          b.customer_name === team.name ||
-          b.customer_name?.toLowerCase() === team.team_name?.toLowerCase() ||
-          b.customer_name?.toLowerCase() === team.name?.toLowerCase()
-        );
-        if (!matchesEntityId && !matchesCustomerName) {
-          return false;
+
+      // Filter by specific team
+      if (selectedTeamId !== 'all' && selectedTeamName) {
+        // Check by entity_id first (most reliable)
+        if (b.entity_id === selectedTeamId) return true;
+        // Fall back to customer_name matching
+        if (b.customer_name && selectedTeamName) {
+          const bookingName = b.customer_name.toLowerCase().trim();
+          const teamName = selectedTeamName.toLowerCase().trim();
+          if (bookingName === teamName) return true;
         }
+        // No match - filter out
+        return false;
       }
+
       return true;
     }).sort((a, b) => {
       const dateCompare = bookingsFilter === 'past'
