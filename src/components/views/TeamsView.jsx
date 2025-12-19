@@ -86,37 +86,35 @@ export default function TeamsView({ onBookingClick }) {
     }));
   }, [teams]);
 
-  // Filter bookings
-  const filteredBookings = useMemo(() => {
-    return bookings.filter(b => {
-      if (!b.booking_type?.startsWith('team_')) return false;
-      if (b.status === 'cancelled') return false;
-      if (bookingsFilter === 'upcoming' && b.date < today) return false;
-      if (bookingsFilter === 'past' && b.date >= today) return false;
+  // Filter bookings - compute fresh each render to avoid stale data
+  const filteredBookings = bookings.filter(b => {
+    if (!b.booking_type?.startsWith('team_')) return false;
+    if (b.status === 'cancelled') return false;
+    if (bookingsFilter === 'upcoming' && b.date < today) return false;
+    if (bookingsFilter === 'past' && b.date >= today) return false;
 
-      // Map team type filter to booking type for comparison
-      if (teamTypeFilter !== 'all') {
-        const expectedBookingType = TEAM_TYPE_TO_BOOKING_TYPE[teamTypeFilter] || teamTypeFilter;
-        if (b.booking_type !== expectedBookingType) return false;
+    // Map team type filter to booking type for comparison
+    if (teamTypeFilter !== 'all') {
+      const expectedBookingType = TEAM_TYPE_TO_BOOKING_TYPE[teamTypeFilter] || teamTypeFilter;
+      if (b.booking_type !== expectedBookingType) return false;
+    }
+
+    // Filter by specific team - match by customer_name
+    if (selectedTeamId !== 'all') {
+      const team = teams.find(t => t.team_id === selectedTeamId);
+      if (team && b.customer_name !== team.team_name && b.customer_name !== team.name) {
+        return false;
       }
+    }
 
-      // Filter by specific team - match by customer_name
-      if (selectedTeamId !== 'all') {
-        const team = teams.find(t => t.team_id === selectedTeamId);
-        if (team && b.customer_name !== team.team_name && b.customer_name !== team.name) {
-          return false;
-        }
-      }
-
-      return true;
-    }).sort((a, b) => {
-      const dateCompare = bookingsFilter === 'past'
-        ? b.date.localeCompare(a.date)
-        : a.date.localeCompare(b.date);
-      if (dateCompare !== 0) return dateCompare;
-      return a.time_start.localeCompare(b.time_start);
-    });
-  }, [bookings, bookingsFilter, teamTypeFilter, selectedTeamId, teams, today]);
+    return true;
+  }).sort((a, b) => {
+    const dateCompare = bookingsFilter === 'past'
+      ? b.date.localeCompare(a.date)
+      : a.date.localeCompare(b.date);
+    if (dateCompare !== 0) return dateCompare;
+    return a.time_start.localeCompare(b.time_start);
+  });
 
   const teamsForDropdown = useMemo(() => {
     if (teamTypeFilter === 'all') return activeTeams;
