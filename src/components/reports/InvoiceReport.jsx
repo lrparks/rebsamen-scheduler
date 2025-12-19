@@ -3,12 +3,19 @@ import { useBookingsContext } from '../../context/BookingsContext.jsx';
 import { useTeams } from '../../hooks/useTeams.js';
 import { formatDateISO, formatDateDisplay } from '../../utils/dateHelpers.js';
 import { getBookingDurationHours, formatCurrency } from '../../utils/reportUtils.js';
-import { calculateTotalRate, getRateBreakdown } from '../../utils/rates.js';
 import Select from '../common/Select.jsx';
-import Button from '../common/Button.jsx';
+
+// Team type labels for display
+const TEAM_TYPE_LABELS = {
+  'team_hs': 'High School',
+  'team_college': 'College',
+  'team_usta': 'USTA League',
+  'team_other': 'Other Team',
+};
 
 /**
  * Get team invoice data - detailed breakdown of bookings with hours and rates
+ * Uses team's court_rate for calculations
  * @param {Array} bookings - All bookings
  * @param {Array} teams - Teams list
  * @param {string} teamId - Team ID to filter
@@ -18,6 +25,7 @@ import Button from '../common/Button.jsx';
  */
 function getTeamInvoiceData(bookings, teams, teamId, startDate, endDate) {
   const team = teams?.find(t => t.team_id === teamId);
+  const courtRate = team?.court_rate ? parseFloat(team.court_rate) : 0;
 
   const teamBookings = bookings.filter(b =>
     b.entity_id === teamId &&
@@ -29,13 +37,8 @@ function getTeamInvoiceData(bookings, teams, teamId, startDate, endDate) {
 
   const lineItems = teamBookings.map(booking => {
     const hours = getBookingDurationHours(booking);
-    const breakdown = getRateBreakdown(
-      booking.date,
-      booking.time_start,
-      booking.time_end,
-      booking.booking_type,
-      1 // single court per booking
-    );
+    // Calculate using team's court_rate: hours * rate per court
+    const total = hours * courtRate;
 
     return {
       booking_id: booking.booking_id,
@@ -44,28 +47,23 @@ function getTeamInvoiceData(bookings, teams, teamId, startDate, endDate) {
       time_end: booking.time_end,
       court: booking.court,
       hours,
-      rateDescription: breakdown.description,
-      total: breakdown.total,
-      primeHours: breakdown.primeHours,
-      nonPrimeHours: breakdown.nonPrimeHours,
+      rate: courtRate,
+      total,
     };
   });
 
   // Calculate totals
   const totalHours = lineItems.reduce((sum, item) => sum + item.hours, 0);
   const totalAmount = lineItems.reduce((sum, item) => sum + item.total, 0);
-  const totalPrimeHours = lineItems.reduce((sum, item) => sum + item.primeHours, 0);
-  const totalNonPrimeHours = lineItems.reduce((sum, item) => sum + item.nonPrimeHours, 0);
 
   return {
     team,
     teamName: team?.team_name || team?.name || 'Unknown Team',
     teamType: team?.team_type || '',
+    courtRate,
     lineItems,
     summary: {
       totalHours,
-      totalPrimeHours,
-      totalNonPrimeHours,
       totalAmount,
       bookingCount: lineItems.length,
     },
@@ -89,19 +87,47 @@ function formatTime(time) {
 export default function InvoiceReport({ startDate, endDate }) {
   const { bookings, loading } = useBookingsContext();
   const { teams, loading: teamsLoading } = useTeams();
+  const [selectedTeamType, setSelectedTeamType] = useState('');
   const [selectedTeamId, setSelectedTeamId] = useState('');
 
-  // Build team options for dropdown
-  const teamOptions = useMemo(() => {
+  // Get unique team types for dropdown
+  const teamTypeOptions = useMemo(() => {
+    if (!teams?.length) return [];
+    const types = [...new Set(teams
+      .filter(t => t.is_active !== 'FALSE' && t.is_active !== false)
+      .map(t => t.team_type)
+      .filter(Boolean)
+    )];
+    return types.map(type => ({
+      value: type,
+      label: TEAM_TYPE_LABELS[type] || type.replace('team_', '').toUpperCase(),
+    })).sort((a, b) => a.label.localeCompare(b.label));
+  }, [teams]);
+
+  // Filter teams by selected type
+  const filteredTeams = useMemo(() => {
     if (!teams?.length) return [];
     return teams
       .filter(t => t.is_active !== 'FALSE' && t.is_active !== false)
+      .filter(t => !selectedTeamType || t.team_type === selectedTeamType);
+  }, [teams, selectedTeamType]);
+
+  // Build team options for dropdown (filtered by type)
+  const teamOptions = useMemo(() => {
+    return filteredTeams
       .map(t => ({
         value: t.team_id,
-        label: `${t.team_name || t.name}${t.team_type ? ` (${t.team_type.replace('team_', '').toUpperCase()})` : ''}`,
+        label: t.team_name || t.name,
+        courtRate: t.court_rate,
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [teams]);
+  }, [filteredTeams]);
+
+  // Reset team selection when type changes
+  const handleTeamTypeChange = (type) => {
+    setSelectedTeamType(type);
+    setSelectedTeamId('');
+  };
 
   // Get invoice data for selected team
   const invoiceData = useMemo(() => {
@@ -119,16 +145,36 @@ export default function InvoiceReport({ startDate, endDate }) {
 
   return (
     <div className="space-y-6">
-      {/* Team Selector */}
+      {/* Team Type & Team Selectors */}
       <div className="bg-white rounded-lg border border-gray-200 p-4 no-print">
-        <div className="max-w-md">
-          <Select
-            label="Select Team"
-            value={selectedTeamId}
-            onChange={setSelectedTeamId}
-            options={teamOptions}
-            placeholder="Choose a team..."
-          />
+        <div className="flex flex-wrap gap-4">
+          <div className="w-48">
+            <Select
+              label="Team Type"
+              value={selectedTeamType}
+              onChange={handleTeamTypeChange}
+              options={teamTypeOptions}
+              placeholder="All Types"
+            />
+          </div>
+          <div className="w-64">
+            <Select
+              label="Select Team"
+              value={selectedTeamId}
+              onChange={setSelectedTeamId}
+              options={teamOptions}
+              placeholder="Choose a team..."
+            />
+          </div>
+          {selectedTeamId && invoiceData && (
+            <div className="flex items-end pb-2">
+              <span className="text-sm text-gray-500">
+                Court Rate: <span className="font-semibold text-green-600">
+                  {invoiceData.courtRate > 0 ? `$${invoiceData.courtRate.toFixed(2)}/hr` : 'Not set'}
+                </span>
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -154,11 +200,14 @@ export default function InvoiceReport({ startDate, endDate }) {
             <h3 className="text-lg font-semibold text-gray-900">{invoiceData.teamName}</h3>
             {invoiceData.teamType && (
               <p className="text-sm text-gray-500">
-                Type: {invoiceData.teamType.replace('team_', '').toUpperCase()}
+                Type: {TEAM_TYPE_LABELS[invoiceData.teamType] || invoiceData.teamType.replace('team_', '').toUpperCase()}
               </p>
             )}
             <p className="text-sm text-gray-500 mt-1">
               Period: {formatDateDisplay(startDate)} - {formatDateDisplay(endDate)}
+            </p>
+            <p className="text-sm text-gray-500">
+              Rate: ${invoiceData.courtRate.toFixed(2)} per court hour
             </p>
           </div>
 
@@ -172,7 +221,7 @@ export default function InvoiceReport({ startDate, endDate }) {
                     <th className="text-left py-2 text-sm font-medium text-gray-600">Time</th>
                     <th className="text-center py-2 text-sm font-medium text-gray-600">Court</th>
                     <th className="text-right py-2 text-sm font-medium text-gray-600">Hours</th>
-                    <th className="text-left py-2 text-sm font-medium text-gray-600 pl-4">Rate</th>
+                    <th className="text-right py-2 text-sm font-medium text-gray-600">Rate</th>
                     <th className="text-right py-2 text-sm font-medium text-gray-600">Total</th>
                   </tr>
                 </thead>
@@ -191,8 +240,8 @@ export default function InvoiceReport({ startDate, endDate }) {
                       <td className="py-2 text-sm text-gray-900 text-right">
                         {item.hours.toFixed(1)}
                       </td>
-                      <td className="py-2 text-sm text-gray-600 pl-4">
-                        {item.rateDescription}
+                      <td className="py-2 text-sm text-gray-600 text-right">
+                        ${item.rate.toFixed(2)}
                       </td>
                       <td className="py-2 text-sm font-medium text-gray-900 text-right">
                         {formatCurrency(item.total)}
@@ -205,29 +254,26 @@ export default function InvoiceReport({ startDate, endDate }) {
               {/* Summary */}
               <div className="border-t-2 border-gray-300 pt-4">
                 <div className="flex justify-end">
-                  <div className="w-64">
+                  <div className="w-72">
                     <div className="flex justify-between py-1">
                       <span className="text-sm text-gray-600">Total Court Hours:</span>
                       <span className="text-sm font-medium">{invoiceData.summary.totalHours.toFixed(1)}</span>
                     </div>
-                    {invoiceData.summary.totalNonPrimeHours > 0 && (
-                      <div className="flex justify-between py-1 text-gray-500">
-                        <span className="text-xs">Non-Prime Hours (@ $10/hr):</span>
-                        <span className="text-xs">{invoiceData.summary.totalNonPrimeHours.toFixed(1)}</span>
-                      </div>
-                    )}
-                    {invoiceData.summary.totalPrimeHours > 0 && (
-                      <div className="flex justify-between py-1 text-gray-500">
-                        <span className="text-xs">Prime Hours (@ $12/hr):</span>
-                        <span className="text-xs">{invoiceData.summary.totalPrimeHours.toFixed(1)}</span>
-                      </div>
-                    )}
+                    <div className="flex justify-between py-1">
+                      <span className="text-sm text-gray-600">Rate per Court Hour:</span>
+                      <span className="text-sm font-medium">${invoiceData.courtRate.toFixed(2)}</span>
+                    </div>
                     <div className="flex justify-between py-2 border-t border-gray-200 mt-2">
                       <span className="text-base font-semibold text-gray-900">Total Due:</span>
                       <span className="text-base font-bold text-green-600">
                         {formatCurrency(invoiceData.summary.totalAmount)}
                       </span>
                     </div>
+                    {invoiceData.courtRate === 0 && (
+                      <div className="mt-2 p-2 bg-amber-50 rounded text-xs text-amber-700">
+                        Note: Court rate is not set for this team. Please update the team's court rate to calculate invoice totals.
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -253,7 +299,7 @@ export default function InvoiceReport({ startDate, endDate }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
           <h3 className="text-lg font-medium text-gray-900 mb-1">Generate Team Invoice</h3>
-          <p className="text-gray-500">Select a team from the dropdown above to generate an invoice for their court usage.</p>
+          <p className="text-gray-500">Select a team type and team from the dropdowns above to generate an invoice for their court usage.</p>
         </div>
       )}
     </div>
