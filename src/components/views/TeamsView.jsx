@@ -178,11 +178,14 @@ export default function TeamsView({ onBookingClick }) {
         setShowFormModal(false);
         setEditingTeam(null);
         refreshTeams();
+        return { success: true };
       } else {
         showToast(result.error || 'Failed to save team', 'error');
+        return { success: false };
       }
     } catch (error) {
       showToast('Failed to save team', 'error');
+      return { success: false };
     }
   };
 
@@ -200,9 +203,10 @@ export default function TeamsView({ onBookingClick }) {
       </div>
 
       {/* TOP HALF - Team Cards */}
-      <div className="flex-1 min-h-0 flex flex-col">
+      <div className="h-1/2 min-h-0 flex flex-col bg-white rounded-lg border border-gray-200">
         {/* Teams Filter Row */}
-        <div className="flex items-center gap-4 mb-3 flex-shrink-0">
+        <div className="flex items-center gap-4 px-4 py-3 border-b border-gray-200 flex-shrink-0">
+          <h3 className="font-medium text-gray-900">Teams</h3>
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium text-gray-700">Type:</label>
             <select
@@ -223,29 +227,39 @@ export default function TeamsView({ onBookingClick }) {
           </span>
         </div>
 
-        {/* Team Cards - Horizontal Scroll */}
-        <div className="overflow-x-auto flex-1">
-          <div className="flex gap-4 pb-2" style={{ minWidth: 'max-content' }}>
-            {filteredTeams.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 w-full">
-                No teams found
-              </div>
-            ) : (
-              filteredTeams.map((team) => (
+        {/* Team Cards - 5 columns x 2 rows grid */}
+        <div className="overflow-auto flex-1 p-4">
+          {filteredTeams.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No teams found
+            </div>
+          ) : (
+            <div className="grid grid-cols-5 gap-3 auto-rows-min" style={{ gridTemplateRows: 'repeat(2, minmax(0, 1fr))' }}>
+              {filteredTeams.slice(0, 10).map((team) => (
                 <TeamCard
                   key={team.team_id}
                   team={team}
-                  onClick={() => setSelectedTeam(team)}
+                  onClick={() => {
+                    // Set team filter for bookings below
+                    setSelectedTeamId(team.team_id);
+                  }}
+                  onViewDetails={() => setSelectedTeam(team)}
                   inSeason={isInSeason(team)}
+                  isSelected={selectedTeamId === team.team_id}
                 />
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          )}
+          {filteredTeams.length > 10 && (
+            <div className="text-sm text-gray-500 mt-2 text-center">
+              Showing 10 of {filteredTeams.length} teams. Use filters or dropdown below to find more.
+            </div>
+          )}
         </div>
       </div>
 
       {/* BOTTOM HALF - Bookings Table */}
-      <div className="flex-1 min-h-0 flex flex-col bg-white rounded-lg border border-gray-200">
+      <div className="h-1/2 min-h-0 flex flex-col bg-white rounded-lg border border-gray-200">
         {/* Bookings Header & Filters */}
         <div className="flex flex-wrap items-center gap-4 px-4 py-3 border-b border-gray-200 flex-shrink-0">
           <h3 className="font-medium text-gray-900">Team Bookings</h3>
@@ -361,45 +375,44 @@ export default function TeamsView({ onBookingClick }) {
   );
 }
 
-function TeamCard({ team, onClick, inSeason }) {
+function TeamCard({ team, onClick, onViewDetails, inSeason, isSelected }) {
   return (
     <div
       onClick={onClick}
-      className={`rounded-lg border p-4 hover:shadow-md cursor-pointer transition-all w-64 flex-shrink-0 ${
-        inSeason
-          ? 'bg-white border-gray-200 hover:border-green-500'
-          : 'bg-gray-50 border-gray-300 opacity-75'
+      className={`rounded-lg border p-3 cursor-pointer transition-all ${
+        isSelected
+          ? 'bg-green-50 border-green-500 ring-2 ring-green-500'
+          : inSeason
+            ? 'bg-white border-gray-200 hover:border-green-300 hover:shadow-sm'
+            : 'bg-gray-50 border-gray-300 opacity-75'
       }`}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <h4 className="font-medium text-gray-900 truncate">{team.team_name || team.name}</h4>
-          <p className="text-sm text-gray-500">{getTeamTypeLabel(team.team_type)}</p>
+          <h4 className="font-medium text-gray-900 truncate text-sm">{team.team_name || team.name}</h4>
+          <p className="text-xs text-gray-500">{getTeamTypeLabel(team.team_type)}</p>
         </div>
-        <div className="ml-2 flex flex-col items-end gap-1 flex-shrink-0">
-          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-            team.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-          }`}>
-            {team.status || 'Active'}
+        {!inSeason && (
+          <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-amber-100 text-amber-700 ml-1">
+            Off
           </span>
-          {!inSeason && (
-            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700">
-              Off Season
-            </span>
-          )}
-        </div>
-      </div>
-      <div className="mt-3 space-y-1 text-sm">
-        {(team.school_name || team.organization) && (
-          <div className="text-gray-600 truncate">{team.school_name || team.organization}</div>
-        )}
-        {team.contact_name && (
-          <div className="text-gray-500 text-xs">Contact: {team.contact_name}</div>
-        )}
-        {(team.contact_phone || team.phone) && (
-          <div className="text-gray-500 text-xs">Phone: {team.contact_phone || team.phone}</div>
         )}
       </div>
+      {(team.school_name || team.organization) && (
+        <div className="text-xs text-gray-600 truncate mt-1">{team.school_name || team.organization}</div>
+      )}
+      {team.court_rate && (
+        <div className="text-xs text-green-600 font-medium mt-1">${parseFloat(team.court_rate).toFixed(2)}/hr</div>
+      )}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onViewDetails?.();
+        }}
+        className="mt-2 w-full px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 transition-colors"
+      >
+        View Details
+      </button>
     </div>
   );
 }
@@ -451,6 +464,12 @@ function TeamDetailModal({ team, onClose, onEdit, onDuplicate, onDelete }) {
             <div>
               <span className="text-sm font-medium text-gray-500">Default Courts:</span>
               <p className="text-gray-900">{team.default_courts}</p>
+            </div>
+          )}
+          {team.court_rate && (
+            <div>
+              <span className="text-sm font-medium text-gray-500">Court Rate:</span>
+              <p className="text-gray-900">${parseFloat(team.court_rate).toFixed(2)}/hr</p>
             </div>
           )}
           {team.season_start && team.season_end && (
@@ -508,6 +527,7 @@ function TeamFormModal({ isOpen, onClose, team, onSubmit }) {
     default_courts: '',
     season_start: '',
     season_end: '',
+    court_rate: '',
     notes: '',
   });
   const [saving, setSaving] = useState(false);
@@ -525,6 +545,7 @@ function TeamFormModal({ isOpen, onClose, team, onSubmit }) {
         default_courts: team.default_courts || '',
         season_start: team.season_start || '',
         season_end: team.season_end || '',
+        court_rate: team.court_rate || '',
         notes: team.notes || '',
       });
     } else {
@@ -538,6 +559,7 @@ function TeamFormModal({ isOpen, onClose, team, onSubmit }) {
         default_courts: '',
         season_start: '',
         season_end: '',
+        court_rate: '',
         notes: '',
       });
     }
@@ -550,8 +572,15 @@ function TeamFormModal({ isOpen, onClose, team, onSubmit }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
-    await onSubmit(formData);
-    setSaving(false);
+    try {
+      const result = await onSubmit(formData);
+      // Only reset saving if the modal is still open (i.e., there was an error)
+      if (!result?.success) {
+        setSaving(false);
+      }
+    } catch {
+      setSaving(false);
+    }
   };
 
   const teamTypeOptions = [
@@ -611,12 +640,21 @@ function TeamFormModal({ isOpen, onClose, team, onSubmit }) {
           placeholder="coach@school.edu"
         />
 
-        <Input
-          label="Default Courts"
-          value={formData.default_courts}
-          onChange={handleChange('default_courts')}
-          placeholder="1,2,3,4"
-        />
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="Default Courts"
+            value={formData.default_courts}
+            onChange={handleChange('default_courts')}
+            placeholder="1,2,3,4"
+          />
+          <Input
+            label="Court Rate ($/hr)"
+            type="number"
+            value={formData.court_rate}
+            onChange={handleChange('court_rate')}
+            placeholder="e.g. 10.00"
+          />
+        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <Input

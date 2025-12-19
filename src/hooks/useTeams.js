@@ -44,6 +44,7 @@ export function useTeams() {
       team_type: t.team_type || t.type || '', // CSV might use 'type' instead of 'team_type'
       school_name: t.school_name || t.organization || '',
       contact_phone: t.contact_phone || t.phone || '',
+      court_rate: t.court_rate || '', // Team-specific court rate
     }));
   }, [rawTeams]);
 
