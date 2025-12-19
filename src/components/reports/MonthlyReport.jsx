@@ -180,9 +180,8 @@ export default function MonthlyReport({ monthStart }) {
         <p className="text-sm text-gray-600">Generated {new Date().toLocaleDateString()}</p>
       </div>
 
-      {/* Row 1: Executive Summary - 33/33/33 */}
+      {/* Row 1: Key Metrics, Utilization, Participation - 33/33/33 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Column 1: Court Hours + Revenue + Cost Recovery */}
         <ExecutiveMetricsCard
           courtHours={courtHours}
           revenue={revenue.total}
@@ -191,9 +190,8 @@ export default function MonthlyReport({ monthStart }) {
           comparison={comparison}
           yoyComparison={yoyComparison}
         />
-
-        {/* Column 2: Utilization Summary */}
-        <UtilizationSummaryCard
+        <UtilizationCard
+          utilizationByPeriod={utilizationByPeriod}
           overallUtilization={comparison.thisMonth.utilization}
           primeUtilization={comparison.thisMonth.primeUtilization}
           utilizationTarget={utilizationTarget}
@@ -201,37 +199,26 @@ export default function MonthlyReport({ monthStart }) {
           comparison={comparison}
           yoyComparison={yoyComparison}
         />
-
-        {/* Column 3: Participation Summary */}
-        <ParticipationSummaryCard
+        <ParticipationCard
           participation={participation}
           participationComparison={participationComparison}
         />
       </div>
 
-      {/* Row 2: Details - 33/33/33 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <UtilizationDetailsCard
-          utilizationByPeriod={utilizationByPeriod}
-          primeUtilizationTarget={primeUtilizationTarget}
-        />
-        <ParticipationDetailsCard participation={participation} />
-        <FinancialCard
-          revenue={revenue}
-          revenuePerHour={revenuePerHour}
-          waivedValue={waivedValue}
-        />
-      </div>
-
-      {/* Row 3: Tournaments - Full Width */}
+      {/* Row 2: Tournaments - Full Width */}
       <TournamentsCard
         monthMetrics={tournamentMetrics}
         ytdMetrics={ytdTournamentMetrics}
         monthName={monthName}
       />
 
-      {/* Row 4: Booking Patterns + Contractor - 50/50 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Row 3: Financial, Booking Patterns, Contractor - 33/33/33 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <FinancialCard
+          revenue={revenue}
+          revenuePerHour={revenuePerHour}
+          waivedValue={waivedValue}
+        />
         <BookingPatternsCard
           efficiency={efficiency}
           cancellations={cancellations}
@@ -316,138 +303,74 @@ function ExecutiveMetricsCard({ courtHours, revenue, revenueTarget, costRecovery
 }
 
 /**
- * Utilization Summary Card - Just percentages with MoM/YoY
+ * Combined Utilization Card - Overall stats + By Time Period
  */
-function UtilizationSummaryCard({ overallUtilization, primeUtilization, utilizationTarget, primeUtilizationTarget, comparison, yoyComparison }) {
-  return (
-    <div className="bg-white rounded-lg border border-gray-200">
-      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-        <h3 className="font-medium text-gray-900">Utilization</h3>
-      </div>
-      <div className="p-4 space-y-4">
-        {/* Overall */}
-        <div>
-          <div className="flex items-baseline gap-2">
-            <div className="text-2xl font-bold text-gray-900">{overallUtilization}%</div>
-            {utilizationTarget > 0 && (
-              <span className={`text-sm ${overallUtilization >= utilizationTarget ? 'text-green-600' : 'text-amber-600'}`}>
-                (target: {utilizationTarget}%)
-              </span>
-            )}
-          </div>
-          <div className="text-sm text-gray-500">Overall Utilization</div>
-          <div className="mt-1 flex gap-3 text-xs">
-            <ComparisonBadge label="MoM" value={comparison.change.utilization} suffix="%" />
-            {yoyComparison.hasLastYearData ? (
-              <ComparisonBadge label="YoY" value={yoyComparison.change.hoursPercent} suffix="%" />
-            ) : (
-              <span className="text-gray-400">YoY: no data</span>
-            )}
-          </div>
-        </div>
-
-        {/* Prime Time */}
-        <div className="pt-3 border-t border-gray-100">
-          <div className="flex items-baseline gap-2">
-            <div className="text-2xl font-bold text-gray-900">{primeUtilization}%</div>
-            {primeUtilizationTarget > 0 && (
-              <span className={`text-sm ${primeUtilization >= primeUtilizationTarget ? 'text-green-600' : 'text-amber-600'}`}>
-                (target: {primeUtilizationTarget}%)
-              </span>
-            )}
-          </div>
-          <div className="text-sm text-gray-500">Prime Time (5-9pm)</div>
-          <div className="mt-1 flex gap-3 text-xs">
-            <ComparisonBadge label="MoM" value={comparison.change.primeUtilization} suffix="%" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Participation Summary Card - Adult/Youth with MoM/YoY
- */
-function ParticipationSummaryCard({ participation, participationComparison }) {
-  return (
-    <div className="bg-white rounded-lg border border-gray-200">
-      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-        <h3 className="font-medium text-gray-900">Participation</h3>
-      </div>
-      <div className="p-4 space-y-4">
-        {/* Adults */}
-        <div>
-          <div className="text-2xl font-bold text-gray-900">{participation.adults}</div>
-          <div className="text-sm text-gray-500">Adult Participants</div>
-          <div className="mt-1 flex gap-3 text-xs">
-            <ComparisonBadge label="MoM" value={participationComparison.momChange.adults} />
-            {participationComparison.hasLastYearData ? (
-              <ComparisonBadge label="YoY" value={participationComparison.yoyChange.adults} />
-            ) : (
-              <span className="text-gray-400">YoY: no data</span>
-            )}
-          </div>
-        </div>
-
-        {/* Youth */}
-        <div className="pt-3 border-t border-gray-100">
-          <div className="text-2xl font-bold text-blue-600">{participation.youth}</div>
-          <div className="text-sm text-gray-500">Youth Participants</div>
-          <div className="mt-1 flex gap-3 text-xs">
-            <ComparisonBadge label="MoM" value={participationComparison.momChange.youth} />
-            {participationComparison.hasLastYearData ? (
-              <ComparisonBadge label="YoY" value={participationComparison.yoyChange.youth} />
-            ) : (
-              <span className="text-gray-400">YoY: no data</span>
-            )}
-          </div>
-        </div>
-
-        {/* Total */}
-        <div className="pt-3 border-t border-gray-100 text-center">
-          <span className="text-lg font-semibold text-gray-700">{participation.total} total</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Utilization Details Card - By time period
- */
-function UtilizationDetailsCard({ utilizationByPeriod, primeUtilizationTarget }) {
+function UtilizationCard({ utilizationByPeriod, overallUtilization, primeUtilization, utilizationTarget, primeUtilizationTarget, comparison, yoyComparison }) {
   return (
     <div className="bg-white rounded-lg border border-gray-200">
       <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
         <h3 className="font-medium text-gray-900">Utilization by Time Period</h3>
       </div>
       <div className="p-4">
-        <div className="space-y-3">
+        {/* Overall Summary */}
+        <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-100">
+          <div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-gray-900">{overallUtilization}%</span>
+              {utilizationTarget > 0 && (
+                <span className={`text-xs ${overallUtilization >= utilizationTarget ? 'text-green-600' : 'text-amber-600'}`}>
+                  (target: {utilizationTarget}%)
+                </span>
+              )}
+            </div>
+            <div className="text-xs text-gray-500">Overall</div>
+          </div>
+          <div className="text-right">
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-green-600">{primeUtilization}%</span>
+              {primeUtilizationTarget > 0 && (
+                <span className={`text-xs ${primeUtilization >= primeUtilizationTarget ? 'text-green-600' : 'text-amber-600'}`}>
+                  ({primeUtilizationTarget}%)
+                </span>
+              )}
+            </div>
+            <div className="text-xs text-gray-500">Prime Time</div>
+          </div>
+        </div>
+
+        {/* MoM/YoY */}
+        <div className="flex gap-4 text-xs mb-3 pb-3 border-b border-gray-100">
+          <ComparisonBadge label="MoM" value={comparison.change.utilization} suffix="%" />
+          {yoyComparison.hasLastYearData ? (
+            <ComparisonBadge label="YoY" value={yoyComparison.change.hoursPercent} suffix="%" />
+          ) : (
+            <span className="text-gray-400">YoY: no data</span>
+          )}
+        </div>
+
+        {/* By Time Period */}
+        <div className="space-y-2">
           {Object.entries(utilizationByPeriod).map(([key, data]) => {
             const target = key === 'PRIME' ? primeUtilizationTarget : null;
             return (
               <div key={key}>
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-sm text-gray-700">{data.label}</span>
-                  <span className={`text-sm font-medium ${
+                <div className="flex justify-between items-center mb-0.5">
+                  <span className="text-xs text-gray-700">{data.label}</span>
+                  <span className={`text-xs font-medium ${
                     target && data.utilization >= target ? 'text-green-600' :
                     target && data.utilization < target ? 'text-amber-600' : 'text-gray-900'
                   }`}>
                     {data.utilization}%
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-gray-200 rounded-full h-1.5">
                   <div
-                    className={`h-2 rounded-full ${
+                    className={`h-1.5 rounded-full ${
                       key === 'PRIME' ? 'bg-green-500' :
                       key === 'AFTERNOON' ? 'bg-blue-500' : 'bg-gray-400'
                     }`}
                     style={{ width: `${Math.min(data.utilization, 100)}%` }}
                   />
-                </div>
-                <div className="text-xs text-gray-500 mt-0.5">
-                  {data.booked} / {data.total} hrs
                 </div>
               </div>
             );
@@ -459,9 +382,9 @@ function UtilizationDetailsCard({ utilizationByPeriod, primeUtilizationTarget })
 }
 
 /**
- * Participation Details Card
+ * Combined Participation Card - Adult/Youth with MoM/YoY + Details
  */
-function ParticipationDetailsCard({ participation }) {
+function ParticipationCard({ participation, participationComparison }) {
   return (
     <div className="bg-white rounded-lg border border-gray-200">
       <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
@@ -472,46 +395,58 @@ function ParticipationDetailsCard({ participation }) {
           <div className="text-sm text-gray-500">No participation data this month</div>
         ) : (
           <>
-            {/* Youth percentage bar */}
-            <div className="mb-4">
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-600">Youth vs Adult</span>
-                <span className="font-medium">{participation.youthPercentage}% youth</span>
+            {/* Adult/Youth Summary */}
+            <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-100">
+              <div>
+                <div className="text-xl font-bold text-gray-900">{participation.adults}</div>
+                <div className="text-xs text-gray-500">Adults</div>
+                <div className="text-xs mt-0.5">
+                  <ComparisonBadge label="MoM" value={participationComparison.momChange.adults} />
+                </div>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-3 flex overflow-hidden">
+              <div className="text-right">
+                <div className="text-xl font-bold text-blue-600">{participation.youth}</div>
+                <div className="text-xs text-gray-500">Youth</div>
+                <div className="text-xs mt-0.5">
+                  <ComparisonBadge label="MoM" value={participationComparison.momChange.youth} />
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-xl font-bold text-gray-700">{participation.total}</div>
+                <div className="text-xs text-gray-500">Total</div>
+              </div>
+            </div>
+
+            {/* YoY Comparison */}
+            <div className="flex gap-4 text-xs mb-3 pb-3 border-b border-gray-100">
+              {participationComparison.hasLastYearData ? (
+                <>
+                  <span className="text-gray-500">YoY:</span>
+                  <ComparisonBadge label="Adults" value={participationComparison.yoyChange.adults} />
+                  <ComparisonBadge label="Youth" value={participationComparison.yoyChange.youth} />
+                </>
+              ) : (
+                <span className="text-gray-400">YoY: no data</span>
+              )}
+            </div>
+
+            {/* Youth percentage bar */}
+            <div className="mb-3">
+              <div className="flex justify-between text-xs mb-1">
+                <span className="text-gray-600">Youth vs Adult</span>
+                <span className="font-medium">{participation.youthPercentage}%</span>
+              </div>
+              <div className="w-full bg-gray-300 rounded-full h-2 flex overflow-hidden">
                 <div
-                  className="h-3 bg-blue-500"
+                  className="h-2 bg-blue-500"
                   style={{ width: `${participation.youthPercentage}%` }}
                 />
-                <div
-                  className="h-3 bg-gray-400"
-                  style={{ width: `${100 - participation.youthPercentage}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>Youth: {participation.youth}</span>
-                <span>Adult: {participation.adults}</span>
               </div>
             </div>
 
-            {/* By booking type */}
-            <div className="space-y-2 pt-3 border-t border-gray-100">
-              <div className="text-xs font-medium text-gray-500 uppercase">By Booking Type</div>
-              {Object.entries(participation.byType || {}).map(([type, count]) => (
-                count > 0 && (
-                  <div key={type} className="flex justify-between text-sm">
-                    <span className="text-gray-600 capitalize">{type.replace('_', ' ')}</span>
-                    <span className="font-medium">{count}</span>
-                  </div>
-                )
-              ))}
-            </div>
-
-            <div className="pt-3 border-t border-gray-100 mt-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Avg per booking</span>
-                <span className="font-medium">{participation.avgPerBooking} players</span>
-              </div>
+            {/* Avg per booking */}
+            <div className="text-xs text-gray-600">
+              Avg per booking: <span className="font-medium">{participation.avgPerBooking}</span> players
             </div>
           </>
         )}

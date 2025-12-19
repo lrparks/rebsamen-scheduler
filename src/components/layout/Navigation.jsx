@@ -14,13 +14,13 @@ export default function Navigation({
   const tabs = [
     { id: 'daily', label: 'Daily View' },
     { id: 'weekly', label: 'Weekly View' },
-    { id: 'contractors', label: 'Contractors' },
+    { id: 'maintenance', label: 'Maintenance' },
+    { id: 'reports', label: 'Reports' },
     { id: 'teams', label: 'Teams' },
+    { id: 'contractors', label: 'Contractors' },
     { id: 'tournaments', label: 'Tournaments' },
     { id: 'closures', label: 'Closures' },
     { id: 'search', label: 'Search' },
-    { id: 'reports', label: 'Reports' },
-    { id: 'maintenance', label: 'Maintenance' },
   ];
 
   const goToToday = () => {
