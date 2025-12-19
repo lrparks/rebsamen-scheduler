@@ -101,18 +101,38 @@ export default function ReportsView({ onEmptyCellClick }) {
       {/* Report Header */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* Report Type Selector */}
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Report:</label>
-            <select
-              value={reportType}
-              onChange={(e) => setReportType(e.target.value)}
-              className="rounded-md border-gray-300 text-sm focus:ring-green-500 focus:border-green-500"
+          {/* Report Type Selector - Button Picker */}
+          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
+            <button
+              onClick={() => setReportType('daily')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                reportType === 'daily'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
             >
-              <option value="daily">Daily Dashboard</option>
-              <option value="weekly">Weekly Summary</option>
-              <option value="monthly">Monthly Report</option>
-            </select>
+              Daily
+            </button>
+            <button
+              onClick={() => setReportType('weekly')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                reportType === 'weekly'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Weekly
+            </button>
+            <button
+              onClick={() => setReportType('monthly')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                reportType === 'monthly'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Monthly
+            </button>
           </div>
 
           {/* Date/Week/Month Navigation */}

@@ -436,6 +436,12 @@ function TournamentDetailModal({ tournament, onClose, onEdit, onDuplicate, onCan
               <p className="text-gray-900">{tournament.default_courts}</p>
             </div>
           )}
+          {tournament.players && (
+            <div>
+              <span className="text-sm font-medium text-gray-500">Players:</span>
+              <p className="text-gray-900 text-lg font-semibold text-blue-600">{tournament.players}</p>
+            </div>
+          )}
           {tournament.notes && (
             <div>
               <span className="text-sm font-medium text-gray-500">Notes:</span>
@@ -482,6 +488,7 @@ function TournamentFormModal({ isOpen, onClose, tournament, onSubmit }) {
     start_date: '',
     end_date: '',
     default_courts: '',
+    players: '',
     notes: '',
   });
   const [saving, setSaving] = useState(false);
@@ -498,6 +505,7 @@ function TournamentFormModal({ isOpen, onClose, tournament, onSubmit }) {
         start_date: tournament.start_date || '',
         end_date: tournament.end_date || '',
         default_courts: tournament.default_courts || '',
+        players: tournament.players || '',
         notes: tournament.notes || '',
       });
     } else {
@@ -510,6 +518,7 @@ function TournamentFormModal({ isOpen, onClose, tournament, onSubmit }) {
         start_date: '',
         end_date: '',
         default_courts: '',
+        players: '',
         notes: '',
       });
     }
@@ -585,12 +594,21 @@ function TournamentFormModal({ isOpen, onClose, tournament, onSubmit }) {
           placeholder="contact@example.com"
         />
 
-        <Input
-          label="Default Courts"
-          value={formData.default_courts}
-          onChange={handleChange('default_courts')}
-          placeholder="1,2,3,4,5,6"
-        />
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="Default Courts"
+            value={formData.default_courts}
+            onChange={handleChange('default_courts')}
+            placeholder="1,2,3,4,5,6"
+          />
+          <Input
+            label="Players"
+            type="number"
+            value={formData.players}
+            onChange={handleChange('players')}
+            placeholder="Total participants"
+          />
+        </div>
 
         <Textarea
           label="Notes"
