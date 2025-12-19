@@ -98,9 +98,18 @@ export default function TeamsView({ onBookingClick }) {
         const expectedBookingType = TEAM_TYPE_TO_BOOKING_TYPE[teamTypeFilter] || teamTypeFilter;
         if (b.booking_type !== expectedBookingType) return false;
       }
-      // Filter by team using entity_id (more reliable than name matching)
+      // Filter by team - check entity_id first, then fall back to customer_name
       if (selectedTeamId !== 'all') {
-        if (b.entity_id !== selectedTeamId) {
+        const team = teams.find(t => t.team_id === selectedTeamId);
+        // Check entity_id match OR customer_name match
+        const matchesEntityId = b.entity_id === selectedTeamId;
+        const matchesCustomerName = team && (
+          b.customer_name === team.team_name ||
+          b.customer_name === team.name ||
+          b.customer_name?.toLowerCase() === team.team_name?.toLowerCase() ||
+          b.customer_name?.toLowerCase() === team.name?.toLowerCase()
+        );
+        if (!matchesEntityId && !matchesCustomerName) {
           return false;
         }
       }
