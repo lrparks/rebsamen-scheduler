@@ -88,12 +88,6 @@ export default function TeamsView({ onBookingClick }) {
 
   // Filter bookings
   const filteredBookings = useMemo(() => {
-    // Get selected team info if a specific team is selected
-    const selectedTeam = selectedTeamId !== 'all'
-      ? teams.find(t => t.team_id === selectedTeamId)
-      : null;
-    const selectedTeamName = selectedTeam?.team_name || selectedTeam?.name || '';
-
     return bookings.filter(b => {
       if (!b.booking_type?.startsWith('team_')) return false;
       if (b.status === 'cancelled') return false;
@@ -106,18 +100,12 @@ export default function TeamsView({ onBookingClick }) {
         if (b.booking_type !== expectedBookingType) return false;
       }
 
-      // Filter by specific team when one is selected
+      // Filter by specific team - match by customer_name
       if (selectedTeamId !== 'all') {
-        // Check by entity_id first (most reliable)
-        if (b.entity_id === selectedTeamId) return true;
-        // Fall back to customer_name matching
-        if (b.customer_name && selectedTeamName) {
-          const bookingName = b.customer_name.toLowerCase().trim();
-          const teamName = selectedTeamName.toLowerCase().trim();
-          if (bookingName === teamName) return true;
+        const team = teams.find(t => t.team_id === selectedTeamId);
+        if (team && b.customer_name !== team.team_name && b.customer_name !== team.name) {
+          return false;
         }
-        // No match - filter out this booking
-        return false;
       }
 
       return true;
