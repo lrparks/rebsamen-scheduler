@@ -2,8 +2,20 @@ import { useState, useMemo } from 'react';
 import { useBookingsContext } from '../../context/BookingsContext.jsx';
 import { useTeams } from '../../hooks/useTeams.js';
 import { formatDateISO, formatDateDisplay } from '../../utils/dateHelpers.js';
-import { getBookingDurationHours, formatCurrency } from '../../utils/reportUtils.js';
+import { getBookingDurationHours } from '../../utils/reportUtils.js';
 import Select from '../common/Select.jsx';
+
+/**
+ * Format currency with 2 decimal places for invoices
+ */
+function formatMoney(amount) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
 
 // Team type labels for display
 const TEAM_TYPE_LABELS = {
@@ -244,7 +256,7 @@ export default function InvoiceReport({ startDate, endDate }) {
                         ${item.rate.toFixed(2)}
                       </td>
                       <td className="py-2 text-sm font-medium text-gray-900 text-right">
-                        {formatCurrency(item.total)}
+                        {formatMoney(item.total)}
                       </td>
                     </tr>
                   ))}
@@ -266,7 +278,7 @@ export default function InvoiceReport({ startDate, endDate }) {
                     <div className="flex justify-between py-2 border-t border-gray-200 mt-2">
                       <span className="text-base font-semibold text-gray-900">Total Due:</span>
                       <span className="text-base font-bold text-green-600">
-                        {formatCurrency(invoiceData.summary.totalAmount)}
+                        {formatMoney(invoiceData.summary.totalAmount)}
                       </span>
                     </div>
                     {invoiceData.courtRate === 0 && (

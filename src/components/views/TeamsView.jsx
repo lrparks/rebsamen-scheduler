@@ -98,9 +98,9 @@ export default function TeamsView({ onBookingClick }) {
         const expectedBookingType = TEAM_TYPE_TO_BOOKING_TYPE[teamTypeFilter] || teamTypeFilter;
         if (b.booking_type !== expectedBookingType) return false;
       }
+      // Filter by team using entity_id (more reliable than name matching)
       if (selectedTeamId !== 'all') {
-        const team = teams.find(t => t.team_id === selectedTeamId);
-        if (team && b.customer_name !== team.team_name && b.customer_name !== team.name) {
+        if (b.entity_id !== selectedTeamId) {
           return false;
         }
       }
