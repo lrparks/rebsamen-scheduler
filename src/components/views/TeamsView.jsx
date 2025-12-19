@@ -92,7 +92,7 @@ export default function TeamsView({ onBookingClick }) {
     const selectedTeam = selectedTeamId !== 'all'
       ? teams.find(t => t.team_id === selectedTeamId)
       : null;
-    const selectedTeamName = selectedTeam?.team_name || selectedTeam?.name || null;
+    const selectedTeamName = selectedTeam?.team_name || selectedTeam?.name || '';
 
     return bookings.filter(b => {
       if (!b.booking_type?.startsWith('team_')) return false;
@@ -106,8 +106,8 @@ export default function TeamsView({ onBookingClick }) {
         if (b.booking_type !== expectedBookingType) return false;
       }
 
-      // Filter by specific team
-      if (selectedTeamId !== 'all' && selectedTeamName) {
+      // Filter by specific team when one is selected
+      if (selectedTeamId !== 'all') {
         // Check by entity_id first (most reliable)
         if (b.entity_id === selectedTeamId) return true;
         // Fall back to customer_name matching
@@ -116,7 +116,7 @@ export default function TeamsView({ onBookingClick }) {
           const teamName = selectedTeamName.toLowerCase().trim();
           if (bookingName === teamName) return true;
         }
-        // No match - filter out
+        // No match - filter out this booking
         return false;
       }
 
