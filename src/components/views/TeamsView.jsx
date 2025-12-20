@@ -99,10 +99,9 @@ export default function TeamsView({ onBookingClick }) {
       if (b.booking_type !== expectedBookingType) return false;
     }
 
-    // Filter by specific team - match by customer_name
+    // Filter by specific team - match by entity_id (direct link to team_id)
     if (selectedTeamId !== 'all') {
-      const team = teams.find(t => t.team_id === selectedTeamId);
-      if (team && b.customer_name !== team.team_name && b.customer_name !== team.name) {
+      if (b.entity_id !== selectedTeamId) {
         return false;
       }
     }
@@ -310,7 +309,7 @@ export default function TeamsView({ onBookingClick }) {
 
         {/* Bookings Table */}
         <div className="overflow-auto flex-1">
-          <table className="min-w-full divide-y divide-gray-200">
+          <table key={`bookings-${selectedTeamId}-${teamTypeFilter}-${bookingsFilter}`} className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50 sticky top-0">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
