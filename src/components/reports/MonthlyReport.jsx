@@ -109,6 +109,53 @@ export default function MonthlyReport({ monthStart }) {
     [bookings, tournaments, ytdRange.start, ytdRange.end]
   );
 
+  // Calculate total players (bookings participant_count + tournaments players)
+  const playersMetrics = useMemo(() => {
+    // Get previous month dates
+    const prevMonthStart = new Date(monthStart);
+    prevMonthStart.setMonth(prevMonthStart.getMonth() - 1);
+    const prevMonthEnd = getMonthEnd(prevMonthStart);
+    const prevStartDate = formatDateISO(prevMonthStart);
+    const prevEndDate = formatDateISO(prevMonthEnd);
+
+    // Get last year same month dates
+    const lastYearMonthStart = new Date(monthStart);
+    lastYearMonthStart.setFullYear(lastYearMonthStart.getFullYear() - 1);
+    const lastYearMonthEnd = getMonthEnd(lastYearMonthStart);
+    const lastYearStartDate = formatDateISO(lastYearMonthStart);
+    const lastYearEndDate = formatDateISO(lastYearMonthEnd);
+
+    // Helper to calculate players for a date range
+    const getPlayersForRange = (start, end) => {
+      // Booking participant_count
+      const bookingPlayers = bookings
+        .filter(b => b.date >= start && b.date <= end && b.status !== 'cancelled')
+        .reduce((sum, b) => sum + (parseInt(b.participant_count, 10) || 0), 0);
+
+      // Tournament players
+      const tournamentPlayers = tournaments
+        .filter(t => t.start_date >= start && t.start_date <= end)
+        .reduce((sum, t) => sum + (parseInt(t.players, 10) || 0), 0);
+
+      return bookingPlayers + tournamentPlayers;
+    };
+
+    const thisMonth = getPlayersForRange(startDate, endDate);
+    const lastMonth = getPlayersForRange(prevStartDate, prevEndDate);
+    const lastYear = getPlayersForRange(lastYearStartDate, lastYearEndDate);
+
+    // Check if we have data from last year
+    const hasLastYearData = bookings.some(b => b.date >= lastYearStartDate && b.date <= lastYearEndDate) ||
+      tournaments.some(t => t.start_date >= lastYearStartDate && t.start_date <= lastYearEndDate);
+
+    return {
+      total: thisMonth,
+      momChange: thisMonth - lastMonth,
+      yoyChange: thisMonth - lastYear,
+      hasLastYearData,
+    };
+  }, [bookings, tournaments, monthStart, startDate, endDate]);
+
   // Utilization by time period
   const utilizationByPeriod = useMemo(() => {
     const monthBookings = bookings.filter(b =>
@@ -184,11 +231,10 @@ export default function MonthlyReport({ monthStart }) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <ExecutiveMetricsCard
           courtHours={courtHours}
-          revenue={revenue.total}
-          revenueTarget={revenueTarget}
-          costRecovery={costRecovery}
+          totalPlayers={playersMetrics.total}
           comparison={comparison}
           yoyComparison={yoyComparison}
+          playersComparison={playersMetrics}
         />
         <UtilizationCard
           utilizationByPeriod={utilizationByPeriod}
@@ -235,9 +281,9 @@ export default function MonthlyReport({ monthStart }) {
 }
 
 /**
- * Executive Metrics Card - Court Hours, Revenue, Cost Recovery
+ * Executive Metrics Card - Court Hours and Total Players
  */
-function ExecutiveMetricsCard({ courtHours, revenue, revenueTarget, costRecovery, comparison, yoyComparison }) {
+function ExecutiveMetricsCard({ courtHours, totalPlayers, comparison, yoyComparison, playersComparison }) {
   return (
     <div className="bg-white rounded-lg border border-gray-200">
       <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
@@ -258,7 +304,21 @@ function ExecutiveMetricsCard({ courtHours, revenue, revenueTarget, costRecovery
           </div>
         </div>
 
-        {/* Revenue */}
+        {/* Total Players */}
+        <div className="pt-3 border-t border-gray-100">
+          <div className="text-2xl font-bold text-blue-600">{totalPlayers}</div>
+          <div className="text-sm text-gray-500">Total Players</div>
+          <div className="mt-1 flex gap-3 text-xs">
+            <ComparisonBadge label="MoM" value={playersComparison.momChange} />
+            {playersComparison.hasLastYearData ? (
+              <ComparisonBadge label="YoY" value={playersComparison.yoyChange} />
+            ) : (
+              <span className="text-gray-400">YoY: no data</span>
+            )}
+          </div>
+        </div>
+
+        {/* Revenue - commented out per user request
         <div className="pt-3 border-t border-gray-100">
           <div className="text-2xl font-bold text-gray-900">{formatCurrency(revenue)}</div>
           <div className="text-sm text-gray-500">Total Revenue</div>
@@ -276,8 +336,9 @@ function ExecutiveMetricsCard({ courtHours, revenue, revenueTarget, costRecovery
             )}
           </div>
         </div>
+        */}
 
-        {/* Cost Recovery */}
+        {/* Cost Recovery - commented out per user request
         <div className="pt-3 border-t border-gray-100">
           {costRecovery !== null ? (
             <>
@@ -297,6 +358,7 @@ function ExecutiveMetricsCard({ courtHours, revenue, revenueTarget, costRecovery
             </>
           )}
         </div>
+        */}
       </div>
     </div>
   );
