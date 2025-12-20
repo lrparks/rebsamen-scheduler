@@ -217,17 +217,17 @@ export default function BookingForm({
             );
           }
 
-          // Filter team options based on booking type
-          const teamTypeMap = {
-            [BOOKING_TYPES.TEAM_USTA]: ['usta_adult', 'usta_junior', 'usta'],
-            [BOOKING_TYPES.TEAM_HS]: ['team_hs', 'high_school', 'hs'],
-            [BOOKING_TYPES.TEAM_COLLEGE]: ['college', 'university'],
+          // Filter team options based on booking type using team_category
+          const categoryMap = {
+            [BOOKING_TYPES.TEAM_USTA]: ['usta_adult', 'usta_junior', 'usta', 'usta_league'],
+            [BOOKING_TYPES.TEAM_HS]: ['team_hs', 'high_school'],
+            [BOOKING_TYPES.TEAM_COLLEGE]: ['College', 'college'],
           };
 
-          const allowedTypes = teamTypeMap[formData.bookingType] || [];
+          const allowedCategories = categoryMap[formData.bookingType] || [];
           const filteredOptions = teamOptions.filter(t =>
-            allowedTypes.some(allowed =>
-              (t.type || '').toLowerCase().includes(allowed.toLowerCase())
+            allowedCategories.some(allowed =>
+              (t.category || '').toLowerCase() === allowed.toLowerCase()
             )
           );
 

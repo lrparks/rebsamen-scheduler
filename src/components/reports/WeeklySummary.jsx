@@ -517,15 +517,19 @@ function TopTeamsCard({ teams, lastWeekTeams }) {
     lastWeekTeams.map(t => [t.id, t.totalHours])
   );
 
-  // Format team type for display
-  const formatTeamType = (type) => {
-    const typeMap = {
-      'team_usta': 'USTA',
+  // Format category for display (short form)
+  const formatCategory = (category) => {
+    const categoryMap = {
+      'usta_adult': 'USTA',
       'team_hs': 'HS',
+      'team_usta': 'USTA',
       'team_college': 'College',
+      'College': 'College',
+      'Rebsamen': 'Reb',
+      'Other': 'Other',
       'team_other': 'Other',
     };
-    return typeMap[type] || '';
+    return categoryMap[category] || '';
   };
 
   return (
@@ -541,21 +545,24 @@ function TopTeamsCard({ teams, lastWeekTeams }) {
             {teams.slice(0, 5).map((team, index) => {
               const lastWeekHours = lastWeekMap.get(team.id) || 0;
               const change = team.totalHours - lastWeekHours;
+              // Show display type if available, otherwise show category badge
+              const displayType = team.displayType || '';
+              const categoryBadge = formatCategory(team.category || team.type);
 
               return (
                 <div key={team.id} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-gray-400 w-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="text-sm font-medium text-gray-400 w-4 flex-shrink-0">
                       {index + 1}.
                     </span>
-                    <span className="text-sm text-gray-900">{team.name}</span>
-                    {team.type && (
-                      <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                        {formatTeamType(team.type)}
+                    <span className="text-sm text-gray-900 truncate">{team.name}</span>
+                    {(displayType || categoryBadge) && (
+                      <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded flex-shrink-0">
+                        {displayType || categoryBadge}
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 flex-shrink-0">
                     <span className="text-sm font-medium text-gray-900">
                       {Math.round(team.totalHours)} hrs
                     </span>

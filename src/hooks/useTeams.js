@@ -6,9 +6,11 @@ import { fetchTeams } from '../utils/api.js';
  *
  * Handles various CSV column naming conventions:
  * - name OR team_name
- * - type OR team_type
+ * - type OR team_type (display type like "Spring", "Mixed Doubles")
+ * - category OR team_category (usta_adult, team_hs, College, etc.)
  * - organization OR school_name
  * - phone OR contact_phone
+ * - team_year (season year like 2024, 2025)
  */
 export function useTeams() {
   const [rawTeams, setRawTeams] = useState([]);
@@ -41,7 +43,9 @@ export function useTeams() {
       ...t,
       // Normalize common field variations
       team_name: t.team_name || t.name || '',
-      team_type: t.team_type || t.type || '', // CSV might use 'type' instead of 'team_type'
+      team_type: t.team_type || t.type || '', // Display type (Spring, Mixed Doubles, High School, etc.)
+      team_category: t.team_category || t.category || '', // Category for filtering (usta_adult, team_hs, College, etc.)
+      team_year: t.team_year || t.year || '', // Season year (2024, 2025, etc.)
       school_name: t.school_name || t.organization || '',
       contact_phone: t.contact_phone || t.phone || '',
       court_rate: t.court_rate || '', // Team-specific court rate
@@ -88,7 +92,9 @@ export function useTeams() {
     return teams.map(t => ({
       value: t.team_id,
       label: t.team_name,
-      type: t.team_type,
+      type: t.team_type, // Display type (Spring, Mixed Doubles, etc.)
+      category: t.team_category, // Category for filtering (usta_adult, team_hs, etc.)
+      year: t.team_year,
       school: t.school_name,
       contact: t.contact_name,
       phone: t.contact_phone,

@@ -17,12 +17,19 @@ function formatMoney(amount) {
   }).format(amount);
 }
 
-// Team type labels for display
-const TEAM_TYPE_LABELS = {
+// Category labels for display
+const CATEGORY_LABELS = {
+  'usta_adult': 'USTA Adult',
   'team_hs': 'High School',
+  'College': 'College',
+  'Rebsamen': 'Rebsamen League',
+  'Other': 'Other',
+  // Legacy mappings
+  'high_school': 'High School',
+  'college': 'College',
   'team_college': 'College',
   'team_usta': 'USTA League',
-  'team_other': 'Other Team',
+  'team_other': 'Other',
 };
 
 /**
@@ -71,7 +78,9 @@ function getTeamInvoiceData(bookings, teams, teamId, startDate, endDate) {
   return {
     team,
     teamName: team?.team_name || team?.name || 'Unknown Team',
-    teamType: team?.team_type || '',
+    teamType: team?.team_type || '', // Display type (Spring, Mixed Doubles, etc.)
+    teamCategory: team?.team_category || '', // Category (usta_adult, team_hs, etc.)
+    teamYear: team?.team_year || '',
     courtRate,
     lineItems,
     summary: {
@@ -102,26 +111,26 @@ export default function InvoiceReport({ startDate, endDate }) {
   const [selectedTeamType, setSelectedTeamType] = useState('');
   const [selectedTeamId, setSelectedTeamId] = useState('');
 
-  // Get unique team types for dropdown
+  // Get unique team categories for dropdown
   const teamTypeOptions = useMemo(() => {
     if (!teams?.length) return [];
-    const types = [...new Set(teams
+    const categories = [...new Set(teams
       .filter(t => t.is_active !== 'FALSE' && t.is_active !== false)
-      .map(t => t.team_type)
+      .map(t => t.team_category)
       .filter(Boolean)
     )];
-    return types.map(type => ({
-      value: type,
-      label: TEAM_TYPE_LABELS[type] || type.replace('team_', '').toUpperCase(),
+    return categories.map(category => ({
+      value: category,
+      label: CATEGORY_LABELS[category] || category,
     })).sort((a, b) => a.label.localeCompare(b.label));
   }, [teams]);
 
-  // Filter teams by selected type
+  // Filter teams by selected category
   const filteredTeams = useMemo(() => {
     if (!teams?.length) return [];
     return teams
       .filter(t => t.is_active !== 'FALSE' && t.is_active !== false)
-      .filter(t => !selectedTeamType || t.team_type === selectedTeamType);
+      .filter(t => !selectedTeamType || t.team_category === selectedTeamType);
   }, [teams, selectedTeamType]);
 
   // Build team options for dropdown (filtered by type)
@@ -162,11 +171,11 @@ export default function InvoiceReport({ startDate, endDate }) {
         <div className="flex flex-wrap gap-4">
           <div className="w-48">
             <Select
-              label="Team Type"
+              label="Category"
               value={selectedTeamType}
               onChange={handleTeamTypeChange}
               options={teamTypeOptions}
-              placeholder="All Types"
+              placeholder="All Categories"
             />
           </div>
           <div className="w-64">
@@ -210,9 +219,12 @@ export default function InvoiceReport({ startDate, endDate }) {
           {/* Team Info */}
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-gray-900">{invoiceData.teamName}</h3>
-            {invoiceData.teamType && (
+            {(invoiceData.teamType || invoiceData.teamCategory) && (
               <p className="text-sm text-gray-500">
-                Type: {TEAM_TYPE_LABELS[invoiceData.teamType] || invoiceData.teamType.replace('team_', '').toUpperCase()}
+                {invoiceData.teamType && `${invoiceData.teamType}`}
+                {invoiceData.teamType && invoiceData.teamCategory && ' • '}
+                {invoiceData.teamCategory && (CATEGORY_LABELS[invoiceData.teamCategory] || invoiceData.teamCategory)}
+                {invoiceData.teamYear && ` (${invoiceData.teamYear})`}
               </p>
             )}
             <p className="text-sm text-gray-500 mt-1">

@@ -11,46 +11,48 @@ import Select from '../common/Select.jsx';
 import { Textarea } from '../common/Input.jsx';
 import { useToast } from '../common/Toast.jsx';
 
-// Map team types (from teams CSV) to booking types (from bookings CSV)
-const TEAM_TYPE_TO_BOOKING_TYPE = {
+// Map team categories to booking types (for filtering bookings by team category)
+const CATEGORY_TO_BOOKING_TYPE = {
+  'usta_adult': 'team_usta',
+  'team_hs': 'team_hs',
+  'College': 'team_college',
+  'Rebsamen': 'team_other', // Rebsamen leagues use team_other booking type
+  'Other': 'team_other',
+  // Legacy mappings for backwards compatibility
   'high_school': 'team_hs',
   'college': 'team_college',
   'usta_league': 'team_usta',
   'usta': 'team_usta',
-  'usta_adult': 'team_usta',
   'usta_junior': 'team_usta',
   'other': 'team_other',
 };
 
-// Team type mapping - maps raw values to display labels
-const TEAM_TYPE_LABELS = {
-  // Booking type codes
+// Category labels for display
+const CATEGORY_LABELS = {
+  'usta_adult': 'USTA Adult',
   'team_hs': 'High School',
-  'team_college': 'College',
-  'team_usta': 'USTA League',
-  'team_other': 'Other Team',
-  // CSV variations with underscores
+  'College': 'College',
+  'Rebsamen': 'Rebsamen League',
+  'Other': 'Other',
+  // Legacy mappings
   'high_school': 'High School',
   'college': 'College',
   'usta_league': 'USTA League',
   'usta': 'USTA League',
-  'usta_adult': 'USTA Adult',
-  'usta_junior': 'USTA Junior',
-  'other': 'Other Team',
-  // Plain labels (proper case)
-  'High School': 'High School',
-  'College': 'College',
-  'USTA League': 'USTA League',
-  'USTA': 'USTA League',
-  'USTA Adult': 'USTA Adult',
-  'USTA Junior': 'USTA Junior',
-  'Other': 'Other Team',
+  'team_usta': 'USTA League',
+  'team_college': 'College',
+  'team_other': 'Other',
 };
 
 function getTeamTypeLabel(type) {
   if (!type) return 'Team';
-  // Try exact match first, then lowercase match
-  return TEAM_TYPE_LABELS[type] || TEAM_TYPE_LABELS[type.toLowerCase()] || type;
+  // Return the type as-is (it's now the display name like "Spring", "Mixed Doubles", etc.)
+  return type;
+}
+
+function getCategoryLabel(category) {
+  if (!category) return 'Team';
+  return CATEGORY_LABELS[category] || category;
 }
 
 /**
@@ -71,18 +73,18 @@ export default function TeamsView({ onBookingClick }) {
 
   const today = formatDateISO(new Date());
 
-  // Filter teams by type
+  // Filter teams by category
   const filteredTeams = useMemo(() => {
     if (teamTypeFilter === 'all') return activeTeams;
-    return activeTeams.filter(t => t.team_type === teamTypeFilter);
+    return activeTeams.filter(t => t.team_category === teamTypeFilter);
   }, [activeTeams, teamTypeFilter]);
 
-  // Get unique team types for dropdown with proper labels
+  // Get unique team categories for dropdown with proper labels
   const teamTypeOptions = useMemo(() => {
-    const types = [...new Set(teams.map(t => t.team_type).filter(Boolean))];
-    return types.sort().map(type => ({
-      value: type,
-      label: getTeamTypeLabel(type),
+    const categories = [...new Set(teams.map(t => t.team_category).filter(Boolean))];
+    return categories.sort().map(category => ({
+      value: category,
+      label: getCategoryLabel(category),
     }));
   }, [teams]);
 
@@ -93,9 +95,9 @@ export default function TeamsView({ onBookingClick }) {
     if (bookingsFilter === 'upcoming' && b.date < today) return false;
     if (bookingsFilter === 'past' && b.date >= today) return false;
 
-    // Map team type filter to booking type for comparison
+    // Map team category filter to booking type for comparison
     if (teamTypeFilter !== 'all') {
-      const expectedBookingType = TEAM_TYPE_TO_BOOKING_TYPE[teamTypeFilter] || teamTypeFilter;
+      const expectedBookingType = CATEGORY_TO_BOOKING_TYPE[teamTypeFilter] || teamTypeFilter;
       if (b.booking_type !== expectedBookingType) return false;
     }
 
@@ -117,7 +119,7 @@ export default function TeamsView({ onBookingClick }) {
 
   const teamsForDropdown = useMemo(() => {
     if (teamTypeFilter === 'all') return activeTeams;
-    return activeTeams.filter(t => t.team_type === teamTypeFilter);
+    return activeTeams.filter(t => t.team_category === teamTypeFilter);
   }, [activeTeams, teamTypeFilter]);
 
   const handleTeamTypeChange = (type) => {
@@ -517,10 +519,36 @@ function TeamDetailModal({ team, onClose, onEdit, onDuplicate, onDelete }) {
   );
 }
 
+// Team type options with their associated categories
+// Category is stored in CSV, type is displayed in pick-list
+const TEAM_TYPE_OPTIONS = [
+  { value: 'Spring', label: 'USTA - Spring', category: 'usta_adult' },
+  { value: 'Mixed Doubles', label: 'USTA - Mixed Doubles', category: 'usta_adult' },
+  { value: 'Combo Doubles', label: 'USTA - Combo Doubles', category: 'usta_adult' },
+  { value: 'Tri-Level', label: 'USTA - Tri-Level', category: 'usta_adult' },
+  { value: 'Singles League', label: 'USTA - Singles League', category: 'usta_adult' },
+  { value: 'Triple Threat', label: 'USTA - Triple Threat', category: 'usta_adult' },
+  { value: 'Monday Night League', label: 'Rebsamen - Monday Night League', category: 'Rebsamen' },
+  { value: 'High School', label: 'High School', category: 'team_hs' },
+  { value: 'College', label: 'College', category: 'College' },
+  { value: 'Other', label: 'Other', category: 'Other' },
+];
+
+// Generate year options (current year +/- 2 years)
+const currentYear = new Date().getFullYear();
+const YEAR_OPTIONS = [
+  { value: String(currentYear - 1), label: String(currentYear - 1) },
+  { value: String(currentYear), label: String(currentYear) },
+  { value: String(currentYear + 1), label: String(currentYear + 1) },
+  { value: String(currentYear + 2), label: String(currentYear + 2) },
+];
+
 function TeamFormModal({ isOpen, onClose, team, onSubmit }) {
   const [formData, setFormData] = useState({
     name: '',
-    team_type: 'team_hs',
+    team_type: 'High School',
+    team_category: 'team_hs',
+    team_year: String(currentYear),
     organization: '',
     contact_name: '',
     phone: '',
@@ -538,7 +566,9 @@ function TeamFormModal({ isOpen, onClose, team, onSubmit }) {
     if (team) {
       setFormData({
         name: team.team_name || team.name || '',
-        team_type: team.team_type || 'team_hs',
+        team_type: team.team_type || 'High School',
+        team_category: team.team_category || 'team_hs',
+        team_year: team.team_year || String(currentYear),
         organization: team.school_name || team.organization || '',
         contact_name: team.contact_name || '',
         phone: team.contact_phone || team.phone || '',
@@ -552,7 +582,9 @@ function TeamFormModal({ isOpen, onClose, team, onSubmit }) {
     } else {
       setFormData({
         name: '',
-        team_type: 'team_hs',
+        team_type: 'High School',
+        team_category: 'team_hs',
+        team_year: String(currentYear),
         organization: '',
         contact_name: '',
         phone: '',
@@ -570,6 +602,16 @@ function TeamFormModal({ isOpen, onClose, team, onSubmit }) {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // Handle type change - automatically set the category
+  const handleTypeChange = (value) => {
+    const typeOption = TEAM_TYPE_OPTIONS.find(t => t.value === value);
+    setFormData(prev => ({
+      ...prev,
+      team_type: value,
+      team_category: typeOption?.category || 'Other',
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -584,13 +626,6 @@ function TeamFormModal({ isOpen, onClose, team, onSubmit }) {
     }
   };
 
-  const teamTypeOptions = [
-    { value: 'team_hs', label: 'High School' },
-    { value: 'team_college', label: 'College' },
-    { value: 'team_usta', label: 'USTA League' },
-    { value: 'team_other', label: 'Other' },
-  ];
-
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={team?.team_id ? 'Edit Team' : 'Add New Team'}>
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -602,13 +637,22 @@ function TeamFormModal({ isOpen, onClose, team, onSubmit }) {
           required
         />
 
-        <Select
-          label="Team Type"
-          value={formData.team_type}
-          onChange={handleChange('team_type')}
-          options={teamTypeOptions}
-          required
-        />
+        <div className="grid grid-cols-2 gap-3">
+          <Select
+            label="Team Type"
+            value={formData.team_type}
+            onChange={handleTypeChange}
+            options={TEAM_TYPE_OPTIONS}
+            required
+          />
+          <Select
+            label="Year"
+            value={formData.team_year}
+            onChange={handleChange('team_year')}
+            options={YEAR_OPTIONS}
+            required
+          />
+        </div>
 
         <Input
           label="School/Organization"

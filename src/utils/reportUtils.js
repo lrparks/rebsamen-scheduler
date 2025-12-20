@@ -509,8 +509,10 @@ export function getTeamHoursForRange(bookings, teams, startDate, endDate) {
       const team = teams?.find(t => t.team_id === teamId);
       teamMap.set(teamId, {
         id: teamId,
-        name: team?.name || booking.customer_name || 'Unknown Team',
-        type: booking.booking_type,
+        name: team?.team_name || team?.name || booking.customer_name || 'Unknown Team',
+        type: booking.booking_type, // booking_type like team_usta, team_hs
+        displayType: team?.team_type || '', // Display type like "Spring", "Mixed Doubles"
+        category: team?.team_category || '', // Category like usta_adult, team_hs
         totalHours: 0,
         revenue: 0,
       });
