@@ -8,6 +8,7 @@ import Modal from '../common/Modal.jsx';
 import Input from '../common/Input.jsx';
 import { Textarea } from '../common/Input.jsx';
 import { useToast } from '../common/Toast.jsx';
+import TournamentBookingModal from '../booking/TournamentBookingModal.jsx';
 
 /**
  * Tournaments management view - 50/50 layout with cards on top, bookings on bottom
@@ -23,6 +24,7 @@ export default function TournamentsView({ onBookingClick }) {
   const [selectedTournament, setSelectedTournament] = useState(null);
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingTournament, setEditingTournament] = useState(null);
+  const [showBookingModal, setShowBookingModal] = useState(false);
 
   const today = formatDateISO(new Date());
 
@@ -129,12 +131,20 @@ export default function TournamentsView({ onBookingClick }) {
       {/* Header */}
       <div className="flex items-center justify-between flex-shrink-0">
         <h2 className="text-xl font-semibold text-gray-900">Tournaments</h2>
-        <button
-          onClick={handleAddTournament}
-          className="px-4 py-2 text-sm font-medium text-white bg-green-700 rounded-lg hover:bg-green-800 transition-colors"
-        >
-          + Add Tournament
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowBookingModal(true)}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            📅 Book Courts
+          </button>
+          <button
+            onClick={handleAddTournament}
+            className="px-4 py-2 text-sm font-medium text-white bg-green-700 rounded-lg hover:bg-green-800 transition-colors"
+          >
+            + Add Tournament
+          </button>
+        </div>
       </div>
 
       {/* Error Message */}
@@ -306,6 +316,12 @@ export default function TournamentsView({ onBookingClick }) {
         onClose={() => { setShowFormModal(false); setEditingTournament(null); }}
         tournament={editingTournament}
         onSubmit={handleFormSubmit}
+      />
+
+      {/* Tournament Booking Modal */}
+      <TournamentBookingModal
+        isOpen={showBookingModal}
+        onClose={() => setShowBookingModal(false)}
       />
     </div>
   );
