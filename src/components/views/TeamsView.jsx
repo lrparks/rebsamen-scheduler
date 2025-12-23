@@ -11,6 +11,7 @@ import Select from '../common/Select.jsx';
 import { Textarea } from '../common/Input.jsx';
 import { useToast } from '../common/Toast.jsx';
 import TeamBookingModal from '../booking/TeamBookingModal.jsx';
+import MondayNightLeagueModal from '../booking/MondayNightLeagueModal.jsx';
 
 // Map team types (from teams CSV) to booking types (from bookings CSV)
 export const TEAM_TYPE_TO_BOOKING_TYPE = {
@@ -70,6 +71,8 @@ export default function TeamsView({ onBookingClick }) {
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingTeam, setEditingTeam] = useState(null);
   const [showTeamBookingModal, setShowTeamBookingModal] = useState(false);
+  const [showMNLModal, setShowMNLModal] = useState(false);
+  const [mnlPrintDate, setMnlPrintDate] = useState(null);
 
   const today = formatDateISO(new Date());
 
@@ -203,6 +206,12 @@ export default function TeamsView({ onBookingClick }) {
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
           >
             + Create Team Booking
+          </button>
+          <button
+            onClick={() => setShowMNLModal(true)}
+            className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            + Monday Night League
           </button>
           <button
             onClick={handleAddTeam}
@@ -387,6 +396,18 @@ export default function TeamsView({ onBookingClick }) {
       <TeamBookingModal
         isOpen={showTeamBookingModal}
         onClose={() => setShowTeamBookingModal(false)}
+      />
+
+      {/* Monday Night League Modal */}
+      <MondayNightLeagueModal
+        isOpen={showMNLModal}
+        onClose={() => setShowMNLModal(false)}
+        onSuccess={(date) => {
+          // Store the date for potential print navigation
+          setMnlPrintDate(date);
+          // Could navigate to reports here if needed
+          showToast('Navigate to Reports > MNL to print check-in sheet', 'info');
+        }}
       />
     </div>
   );
