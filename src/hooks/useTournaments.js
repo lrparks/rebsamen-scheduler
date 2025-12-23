@@ -39,6 +39,7 @@ export function useTournaments() {
       setLoading(true);
       setError(null);
       const data = await fetchTournaments();
+      console.log('[useTournaments] Raw tournament data:', data);
       setTournaments(data);
     } catch (err) {
       console.error('[useTournaments] Error:', err);
@@ -80,14 +81,25 @@ export function useTournaments() {
    * Get upcoming tournaments (starting in the future or currently running)
    */
   const upcomingTournaments = tournaments.filter(t => {
-    if (t.status === 'cancelled') return false;
+    console.log('[useTournaments] Checking tournament:', t.name, 'Status:', t.status, 'End date:', t.end_date);
+
+    if (t.status === 'cancelled') {
+      console.log('[useTournaments] Filtered out (cancelled):', t.name);
+      return false;
+    }
 
     // Check if tournament end date hasn't passed
     if (t.end_date) {
       const endDate = new Date(t.end_date + 'T23:59:59');
-      if (endDate < new Date()) return false;
+      const now = new Date();
+      console.log('[useTournaments] End date check:', t.name, 'endDate:', endDate, 'now:', now, 'has passed:', endDate < now);
+      if (endDate < now) {
+        console.log('[useTournaments] Filtered out (past):', t.name);
+        return false;
+      }
     }
 
+    console.log('[useTournaments] Included in upcoming:', t.name);
     return true;
   }).sort((a, b) => {
     // Sort by start date
