@@ -81,6 +81,7 @@ export default function TournamentBookingModal({ isOpen, onClose }) {
     id: 1,
     date: '',
     allDay: false,
+    allCourts: false,
     timeStart: '08:00',
     timeFinish: '17:00',
     courts: [],
@@ -101,6 +102,7 @@ export default function TournamentBookingModal({ isOpen, onClose }) {
         id: 1,
         date: '',
         allDay: false,
+        allCourts: false,
         timeStart: '08:00',
         timeFinish: '17:00',
         courts: [],
@@ -122,7 +124,10 @@ export default function TournamentBookingModal({ isOpen, onClose }) {
 
   // Filter tournaments by year
   const filteredTournaments = useMemo(() => {
-    return upcomingTournaments.filter(tournament => {
+    console.log('[TournamentBookingModal] Filtering tournaments for year:', selectedYear);
+    console.log('[TournamentBookingModal] Upcoming tournaments:', upcomingTournaments.length, upcomingTournaments);
+
+    const filtered = upcomingTournaments.filter(tournament => {
       // Filter by year - check if tournament overlaps with selected year
       if (tournament.start_date && tournament.end_date) {
         const startDate = new Date(tournament.start_date);
@@ -132,11 +137,17 @@ export default function TournamentBookingModal({ isOpen, onClose }) {
 
         // Check if tournament overlaps with selected year
         const overlaps = startDate <= yearEnd && endDate >= yearStart;
+        console.log('[TournamentBookingModal] Tournament:', tournament.name,
+                    'Dates:', tournament.start_date, 'to', tournament.end_date,
+                    'Overlaps:', overlaps);
         return overlaps;
       }
 
       return true;
     });
+
+    console.log('[TournamentBookingModal] Filtered tournaments:', filtered.length, filtered);
+    return filtered;
   }, [upcomingTournaments, selectedYear]);
 
   // Tournament options for dropdown
@@ -174,6 +185,7 @@ export default function TournamentBookingModal({ isOpen, onClose }) {
         id: index + 1,
         date: date,
         allDay: false,
+        allCourts: defaultCourts.length === 17,
         timeStart: '08:00',
         timeFinish: '17:00',
         courts: defaultCourts,
@@ -183,6 +195,7 @@ export default function TournamentBookingModal({ isOpen, onClose }) {
         id: 1,
         date: '',
         allDay: false,
+        allCourts: false,
         timeStart: '08:00',
         timeFinish: '17:00',
         courts: [],
@@ -201,6 +214,7 @@ export default function TournamentBookingModal({ isOpen, onClose }) {
       id: newId,
       date: '',
       allDay: false,
+      allCourts: defaultCourts.length === 17,
       timeStart: '08:00',
       timeFinish: '17:00',
       courts: defaultCourts,
@@ -225,6 +239,20 @@ export default function TournamentBookingModal({ isOpen, onClose }) {
             updated.timeStart = '08:00';
             updated.timeFinish = '21:00';
           }
+        }
+
+        // If toggling allCourts, select all 17 courts or clear selection
+        if (field === 'allCourts') {
+          if (value) {
+            updated.courts = Array.from({ length: 17 }, (_, i) => i + 1);
+          } else {
+            updated.courts = [];
+          }
+        }
+
+        // If courts are manually changed, update allCourts state
+        if (field === 'courts') {
+          updated.allCourts = value.length === 17;
         }
 
         return updated;
@@ -481,7 +509,9 @@ export default function TournamentBookingModal({ isOpen, onClose }) {
               <div className="col-span-1 text-center">ALL DAY</div>
               <div className="col-span-2">START</div>
               <div className="col-span-2">FINISH</div>
-              <div className="col-span-4">COURTS</div>
+              <div className="col-span-1 text-center">ALL CTS</div>
+              <div className="col-span-2">COURTS</div>
+              <div className="col-span-1"></div>
             </div>
 
             {/* Entries */}
@@ -525,13 +555,23 @@ export default function TournamentBookingModal({ isOpen, onClose }) {
                   />
                 </div>
 
-                <div className="col-span-3">
+                <div className="col-span-1 flex items-center justify-center pt-2">
+                  <input
+                    type="checkbox"
+                    checked={entry.allCourts}
+                    onChange={(e) => handleUpdateEntry(entry.id, 'allCourts', e.target.checked)}
+                    className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+
+                <div className="col-span-2">
                   <MultiSelect
                     value={entry.courts}
                     onChange={(val) => handleUpdateEntry(entry.id, 'courts', val)}
                     options={courtOptions}
                     placeholder="Select..."
                     required
+                    disabled={entry.allCourts}
                   />
                 </div>
 
@@ -563,7 +603,7 @@ export default function TournamentBookingModal({ isOpen, onClose }) {
         {/* COURT SELECTION NOTE */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
           <p className="text-sm text-blue-800">
-            <strong>Court Selection Note:</strong> Use the multi-select interface above (Courts 1-16 + Stadium) for each day.
+            <strong>Court Selection Note:</strong> Use the "All Courts" checkbox to quickly select all 17 courts, or use the multi-select interface (Courts 1-16 + Stadium) to choose specific courts for each day.
           </p>
         </div>
 
