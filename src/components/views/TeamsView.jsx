@@ -10,9 +10,10 @@ import Input from '../common/Input.jsx';
 import Select from '../common/Select.jsx';
 import { Textarea } from '../common/Input.jsx';
 import { useToast } from '../common/Toast.jsx';
+import TeamBookingModal from '../booking/TeamBookingModal.jsx';
 
 // Map team types (from teams CSV) to booking types (from bookings CSV)
-const TEAM_TYPE_TO_BOOKING_TYPE = {
+export const TEAM_TYPE_TO_BOOKING_TYPE = {
   'high_school': 'team_hs',
   'college': 'team_college',
   'usta_league': 'team_usta',
@@ -68,6 +69,7 @@ export default function TeamsView({ onBookingClick }) {
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingTeam, setEditingTeam] = useState(null);
+  const [showTeamBookingModal, setShowTeamBookingModal] = useState(false);
 
   const today = formatDateISO(new Date());
 
@@ -195,12 +197,20 @@ export default function TeamsView({ onBookingClick }) {
       {/* Header */}
       <div className="flex items-center justify-between flex-shrink-0">
         <h2 className="text-xl font-semibold text-gray-900">Teams</h2>
-        <button
-          onClick={handleAddTeam}
-          className="px-4 py-2 text-sm font-medium text-white bg-green-700 rounded-lg hover:bg-green-800 transition-colors"
-        >
-          + Add Team
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowTeamBookingModal(true)}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            + Create Team Booking
+          </button>
+          <button
+            onClick={handleAddTeam}
+            className="px-4 py-2 text-sm font-medium text-white bg-green-700 rounded-lg hover:bg-green-800 transition-colors"
+          >
+            + Add Team
+          </button>
+        </div>
       </div>
 
       {/* TOP HALF - Team Cards */}
@@ -371,6 +381,12 @@ export default function TeamsView({ onBookingClick }) {
         onClose={() => { setShowFormModal(false); setEditingTeam(null); }}
         team={editingTeam}
         onSubmit={handleFormSubmit}
+      />
+
+      {/* Team Booking Modal */}
+      <TeamBookingModal
+        isOpen={showTeamBookingModal}
+        onClose={() => setShowTeamBookingModal(false)}
       />
     </div>
   );
