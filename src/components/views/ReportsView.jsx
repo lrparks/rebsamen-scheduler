@@ -6,6 +6,7 @@ import DailyDashboard from '../reports/DailyDashboard.jsx';
 import WeeklySummary from '../reports/WeeklySummary.jsx';
 import MonthlyReport from '../reports/MonthlyReport.jsx';
 import InvoiceReport from '../reports/InvoiceReport.jsx';
+import MondayNightLeagueReport from '../reports/MondayNightLeagueReport.jsx';
 
 /**
  * Main Reports View with sub-navigation for different report types
@@ -23,6 +24,9 @@ export default function ReportsView({ onEmptyCellClick }) {
   // Invoice date range (default to current month)
   const [invoiceStartDate, setInvoiceStartDate] = useState(() => formatDateISO(getMonthStart(new Date())));
   const [invoiceEndDate, setInvoiceEndDate] = useState(() => formatDateISO(getMonthEnd(new Date())));
+
+  // Monday Night League date
+  const [mnlDate, setMnlDate] = useState(formatDateISO(new Date()));
 
   const today = formatDateISO(new Date());
   const isToday = selectedDate === today;
@@ -148,6 +152,16 @@ export default function ReportsView({ onEmptyCellClick }) {
             >
               Invoice
             </button>
+            <button
+              onClick={() => setReportType('mnl')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                reportType === 'mnl'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              MNL
+            </button>
           </div>
 
           {/* Date/Week/Month Navigation */}
@@ -261,6 +275,21 @@ export default function ReportsView({ onEmptyCellClick }) {
             </div>
           )}
 
+          {reportType === 'mnl' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Select Date:</span>
+              <input
+                type="date"
+                value={mnlDate}
+                onChange={(e) => setMnlDate(e.target.value)}
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              />
+              <span className="text-sm font-medium text-gray-700">
+                {formatDateDisplay(mnlDate)}
+              </span>
+            </div>
+          )}
+
           {/* Print Button */}
           <Button variant="outline" size="sm" onClick={handlePrint} className="no-print">
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -283,6 +312,9 @@ export default function ReportsView({ onEmptyCellClick }) {
       )}
       {reportType === 'invoice' && (
         <InvoiceReport startDate={invoiceStartDate} endDate={invoiceEndDate} />
+      )}
+      {reportType === 'mnl' && (
+        <MondayNightLeagueReport selectedDate={mnlDate} />
       )}
     </div>
   );
